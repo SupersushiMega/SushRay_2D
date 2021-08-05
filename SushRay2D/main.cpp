@@ -27,7 +27,10 @@ void processUserInput(GLFWwindow* window);
 using namespace std;	//use std namespace
 
 const uint16_t START_WIDTH = 600;
-const uint16_t START_HEIGHT = 800;
+const uint16_t START_HEIGHT = 600;
+
+uint16_t winWidth = 600;
+uint16_t winHeight = 600;
 
 class TileMap
 {
@@ -35,6 +38,7 @@ public:
 	TileMap(uint16_t Width, uint16_t Height);
 	~TileMap();
 	uint8_t GetTile(uint16_t x, uint16_t y);
+	void calculateTileScale(uint16_t windowWidth, uint16_t windowHeight);
 	void SetTile(uint16_t x, uint16_t y, uint8_t tileID);
 	uint16_t width;
 	uint16_t height;
@@ -45,7 +49,7 @@ public:
 int main()
 {
 	int32_t status = 0;	//variable for error handling
-	TileMap tileMap(2, 2);
+	TileMap tileMap(100, 100);
 
 	unsigned int VBO;	//Vertex buffer object
 	unsigned int VAO;	//Vertex array object
@@ -64,6 +68,7 @@ int main()
 		return -1;
 	}
 	glfwMakeContextCurrent(window);
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	status = gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 	if (!status)	//check if GLAD failed to initialize
@@ -105,16 +110,49 @@ int main()
 	baseShader.use();
 	baseShader.setVec2("tileScale", tileMap.tileScale);
 
+	glm::vec3 colList[] = {
+		glm::vec3(1.0f, 0.0f, 0.0f),
+		glm::vec3(0.0f, 1.0f, 0.0f),
+		glm::vec3(0.0f, 0.0f, 1.0f),
+		glm::vec3(1.0f, 1.0f, 1.0f)
+	};
+
 	while (!glfwWindowShouldClose(window))
 	{
 		processUserInput(window);
+		tileMap.calculateTileScale(winWidth, winHeight);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		uint8_t i = 0;
+		
+		for (uint8_t x = 0; x < tileMap.width; x++)
+		{
+			for (uint8_t y = 0; y < tileMap.height; y++)
+			{
+				baseShader.setVec2("translation", glm::vec2(tileMap.tileScale.x * (x * 2.0f) - (tileMap.tileScale.x * (tileMap.width - 1)), tileMap.tileScale.y * (y * 2.0f) - (tileMap.tileScale.y * (tileMap.height - 1))));
+				baseShader.setVec2("tileScale", tileMap.tileScale);
+				baseShader.setVec3("col", colList[i]);
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);	
+				i = (i + 1) % 4;
+			}
+		}
+		baseShader.setVec2("translation", glm::vec2(-0.0f, -0.0f));
+		baseShader.setVec2("tileScale", glm::vec2(tileMap.tileScale.x, 0.1f));
+		baseShader.setVec3("col", glm::vec3(0.0f, 0.0f, 0.0f));
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);	
+		//
+		//baseShader.setVec2("translation", glm::vec2(-0.5f, 0.5f));
+		//baseShader.setVec2("tileScale", tileMap.tileScale);
+		//baseShader.setVec3("col", glm::vec3(0.0f, 1.0f, 0.0f));
+		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		//
+		//baseShader.setVec2("translation", glm::vec2(0.5f, -0.5f));
+		//baseShader.setVec2("tileScale", tileMap.tileScale);
+		//baseShader.setVec3("col", glm::vec3(0.0f, 0.0f, 1.0f));
+		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
-
 	tileMap.~TileMap();
 	glfwTerminate();
 	return 0;
@@ -123,6 +161,8 @@ int main()
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	glViewport(0, 0, width, height);
+	winHeight = height;
+	winWidth = width;
 }
 
 void processUserInput(GLFWwindow* window)
@@ -180,6 +220,34 @@ uint8_t TileMap::GetTile(uint16_t x, uint16_t y)
 	//=================
 
 	return MapPtr[(y * width) + x];
+}
+
+void TileMap::calculateTileScale(uint16_t windowWidth, uint16_t windowHeight)
+{
+	float mapRatio = (float)width / (float)height;
+	float winRatio = (float)windowWidth / (float)windowHeight;
+
+	if (mapRatio < winRatio)	//set scale
+	{
+		tileScale.x = (1.0f / height);
+		tileScale.y = (1.0f / height);
+			//compensate for non square window;
+	}
+	else
+	{
+		tileScale.x = (1.0f / width);
+		tileScale.y = (1.0f / width);
+			//compensate for non square window;
+	}
+
+	if (winRatio > 1.0f)
+	{
+		tileScale.x /= winRatio;
+	}
+	else if (winRatio < 1.0f)
+	{
+		tileScale.y *= winRatio;
+	}
 }
 
 void TileMap::SetTile(uint16_t x, uint16_t y, uint8_t tileID)

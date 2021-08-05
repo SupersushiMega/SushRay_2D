@@ -10,7 +10,7 @@ vec3 endPos;
 
 void main()
 {
-	endPos = (startPos * vec3(tileScale, 1.0)) + vec3(0.5, 0.5, 1.0);
+	endPos = (startPos * vec3(tileScale, 1.0)) + vec3(translation, 1.0);
 	gl_Position = vec4(endPos, 1.0);
 	Pos = (endPos + 1)/2;
 }
