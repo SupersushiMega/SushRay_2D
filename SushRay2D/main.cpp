@@ -28,13 +28,13 @@ void processUserInput(GLFWwindow* window);
 
 using namespace std;	//use std namespace
 
-const uint16_t START_WIDTH = 600;
-const uint16_t START_HEIGHT = 600;
+const uint16_t START_WIDTH = 1000;
+const uint16_t START_HEIGHT = 1000;
 
 const double PI = 2 * acos(0.0f);
 
-uint16_t winWidth = 600;
-uint16_t winHeight = 600;
+uint16_t winWidth = 1000;
+uint16_t winHeight = 1000;
 
 class TileMap
 {
@@ -67,28 +67,29 @@ class StaticLightMap
 public:
 	StaticLightMap(uint16_t width, uint16_t height);
 	
-	void calcLightMap(vector<Light> lights);
+	void calcLightMap(vector<Light> lights, TileMap& tileMap);
 
 	uint16_t width;
 	uint16_t height;
 	glm::vec3* mapPtr = nullptr;
 };
 
+	vector<Light> lightList;
+	Light tempLight(glm::vec2(300, 300), 100, glm::vec3(1.0f, 1.0f, 1.0f), 0.1f, 1);
+
 int main()
 {
 	int32_t status = 0;	//variable for error handling
-	TileMap tileMap(100, 100);
+	TileMap tileMap(25, 25);
 	uint8_t x;
 	uint8_t y;
 
-	vector<Light> lightList;
-	Light tempLight(glm::vec2(300, 300), 100, glm::vec3(1.0f, 1.0f, 1.0f), 0.1f, 2);
 
 	lightList.push_back(tempLight);
 
-	for (x = 0; x < 100; x++)
+	for (x = 0; x < 25; x++)
 	{
-		for (y = 0; y < 100; y++)
+		for (y = 0; y < 25; y++)
 		{
 			tileMap.SetTile(x, y, rand() % 2);
 		}
@@ -154,7 +155,7 @@ int main()
 	//static light map setup
 	//==============================================================================================
 	StaticLightMap staticLightMap(600, 600);
-	staticLightMap.calcLightMap(lightList);
+	staticLightMap.calcLightMap(lightList, tileMap);
 	unsigned int staticLightMapObject;
 	float borderCol[] = { 1.0f, 0.0f, 0.0f, 0.0f };	//color outside of map (displayed only when something is displayed outside of map)
 	glGenTextures(1, &staticLightMapObject);
@@ -182,6 +183,8 @@ int main()
 
 	baseShader.use();
 	baseShader.setVec2("tileScale", tileMap.tileScale);
+	baseShader.setFloat("fperPix_X", 1.0f / staticLightMap.width);
+	baseShader.setFloat("fperPix_Y", 1.0f / staticLightMap.height);
 
 	glm::vec3 colList[] = {
 		glm::vec3(0.4f, 0.2f, 0.1f),
@@ -202,6 +205,10 @@ int main()
 		processUserInput(window);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
+		staticLightMap.calcLightMap(lightList, tileMap);
+		glBindTexture(GL_TEXTURE_2D, staticLightMapObject);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
 
 		frameCount++;
 
@@ -245,6 +252,23 @@ void processUserInput(GLFWwindow* window)
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 	{
 		glfwSetWindowShouldClose(window, true);
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+	{
+		lightList[0].location.y += 0.5f;
+	}
+	if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+	{
+		lightList[0].location.y -= 0.5f;
+	}
+	if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+	{
+		lightList[0].location.x += 0.5f;
+	}
+	if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+	{
+		lightList[0].location.x -= 0.5f;
 	}
 }
 
@@ -367,34 +391,42 @@ StaticLightMap::StaticLightMap(uint16_t Width, uint16_t Height)
 	width = Width;
 	height = Height;
 	mapPtr = new glm::vec3[width * height];
+	for (uint32_t i = 0; i < (width * height); i++)	//set map to 0
+	{
+		mapPtr[i] = glm::vec3(0.0f);
+	}
 }
 
-void StaticLightMap::calcLightMap(vector<Light> lights)
+void StaticLightMap::calcLightMap(vector<Light> lights, TileMap& tileMap)
 {
 	uint8_t lightID;
 	uint32_t rayCntr;
 	uint16_t rayDistCntr;
 	float angleDelta;
 	float angle;
-	float lightFalloff;
+	glm::vec3 lightFalloff;
 	glm::vec2 deltaXY;
 	glm::vec3 lightCol;
 	glm::vec2 rayPos;
-
-	uint16_t rayPosCeil_X;
-	uint16_t rayPosCeil_Y;
 	
 	uint16_t rayPosFloor_X;
 	uint16_t rayPosFloor_Y;
-	
+
+	uint16_t LightTileRatio_X = width / tileMap.width;	//the ratio of the x axis in the light map to the x axis of the tile map
+	uint16_t LightTileRatio_Y = height / tileMap.height;	//the ratio of the y axis in the light map to the y axis of the tile map
+
+	for (uint32_t i = 0; i < (width * height); i++)	//set map to 0
+	{
+		mapPtr[i] = glm::vec3(0.0f);
+	}
 
 	for (lightID = 0; lightID < lights.size(); lightID++)
 	{
 		angle = 0;
 		angleDelta = (2 * PI) / lights[lightID].raycount;
-		lightFalloff = 1.0f / lights[lightID].range;
+		lightCol = lights[lightID].color * lights[lightID].intensity;
+		lightFalloff = lightCol / glm::vec3(lights[lightID].range);
 
-		lightCol = lights[lightID].color;// *lights[lightID].intensity;
 
 		for (rayCntr = 0; rayCntr < lights[lightID].raycount; rayCntr++)
 		{
@@ -415,46 +447,31 @@ void StaticLightMap::calcLightMap(vector<Light> lights)
 					break;
 				}
 				//=================
-
-				rayPosCeil_X = ceil(rayPos.x);
-				rayPosCeil_Y = ceil(rayPos.y);
 				rayPosFloor_X = floor(rayPos.x);
 				rayPosFloor_Y = floor(rayPos.y);
 
-				mapPtr[(rayPosCeil_X * width) + (rayPosCeil_Y)] = lightCol - (lightFalloff * rayDistCntr);
-				mapPtr[(rayPosFloor_X * width) + (rayPosFloor_Y)] = lightCol - (lightFalloff * rayDistCntr);
-				//mapPtr[(rayPosFloor_X * width) + (rayPosFloor_Y)] += lightCol;
+				if (tileMap.GetTile(floor(rayPos.x / LightTileRatio_X), floor(rayPos.y / LightTileRatio_Y)) == 0)	//check for solid tile
+				{
+					break;
+				}
+				
+				mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)] += lightCol - (lightFalloff * glm::vec3(rayDistCntr));	//add light to pixel
+				
 				//Clamping
 				//================================================================
-				if (mapPtr[(rayPosCeil_X * width) + (rayPosCeil_Y)].x > 1.0f)
-				{
-					mapPtr[(rayPosCeil_X * width) + (rayPosCeil_Y)].x = 1.0f;
-				}
-
-				if (mapPtr[(rayPosCeil_X * width) + (rayPosCeil_Y)].y > 1.0f)
-				{
-					mapPtr[(rayPosCeil_X * width) + (rayPosCeil_Y)].y = 1.0f;
-				}
-
-				if (mapPtr[(rayPosCeil_X * width) + (rayPosCeil_Y)].z > 1.0f)
-				{
-					mapPtr[(rayPosCeil_X * width) + (rayPosCeil_Y)].z = 1.0f;
-				}
-
-
-				if (mapPtr[(rayPosFloor_X * width) + (rayPosFloor_Y)].x > 1.0f)
+				if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].x > 1.0f)
 				{										   
-					mapPtr[(rayPosFloor_X * width) + (rayPosFloor_Y)].x = 1.0f;
+					mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].x = 1.0f;
 				}
 
-				if (mapPtr[(rayPosFloor_X * width) + (rayPosFloor_Y)].y > 1.0f)
+				if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].y > 1.0f)
 				{
-					mapPtr[(rayPosFloor_X * width) + (rayPosFloor_Y)].y = 1.0f;
+					mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].y = 1.0f;
 				}
 
-				if (mapPtr[(rayPosFloor_X * width) + (rayPosFloor_Y)].z > 1.0f)
+				if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].z > 1.0f)
 				{
-					mapPtr[(rayPosFloor_X * width) + (rayPosFloor_Y)].z = 1.0f;
+					mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].z = 1.0f;
 				}
 				//================================================================
 				rayPos += deltaXY;
