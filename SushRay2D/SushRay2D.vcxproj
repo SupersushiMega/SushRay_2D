@@ -159,6 +159,9 @@
     <None Include="Resources\Shaders\FragmentShader\baseFragShader.frag" />
     <None Include="Resources\Shaders\VertexShader\baseVertShader.vert" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Libraries\include\ShaderLoader\ShaderLoader.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

@@ -39,4 +39,9 @@
       <Filter>Resource Files\VertexShader</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Libraries\include\ShaderLoader\ShaderLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

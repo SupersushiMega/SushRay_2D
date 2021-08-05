@@ -38,18 +38,38 @@ public:
 	TileMap(uint16_t Width, uint16_t Height);
 	~TileMap();
 	uint8_t GetTile(uint16_t x, uint16_t y);
-	void calculateTileScale(uint16_t windowWidth, uint16_t windowHeight);
+	void calcTileValues(uint16_t windowWidth, uint16_t windowHeight);	//calculates values used for scaling and positioning of tiles
 	void SetTile(uint16_t x, uint16_t y, uint8_t tileID);
 	uint16_t width;
 	uint16_t height;
 	glm::vec2 tileScale;
+	glm::vec2 tileDist;
 	uint8_t* MapPtr = nullptr;
+};
+
+class staticLightMap
+{
+	staticLightMap(uint16_t width, uint16_t height);
+	
+	uint16_t width;
 };
 
 int main()
 {
 	int32_t status = 0;	//variable for error handling
 	TileMap tileMap(100, 100);
+	uint8_t x;
+	uint8_t y;
+
+	for (x = 0; x < 100; x++)
+	{
+		for (y = 0; y < 100; y++)
+		{
+			tileMap.SetTile(x, y, rand() % 2);
+		}
+	}
+
+
 
 	unsigned int VBO;	//Vertex buffer object
 	unsigned int VAO;	//Vertex array object
@@ -111,45 +131,47 @@ int main()
 	baseShader.setVec2("tileScale", tileMap.tileScale);
 
 	glm::vec3 colList[] = {
-		glm::vec3(1.0f, 0.0f, 0.0f),
-		glm::vec3(0.0f, 1.0f, 0.0f),
-		glm::vec3(0.0f, 0.0f, 1.0f),
-		glm::vec3(1.0f, 1.0f, 1.0f)
+		glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::vec3(0.8f, 0.8f, 0.8f),
 	};
+	
+	float lastFrame = 0.0f;
+	float xTrans = 0.0f;
 
+	uint16_t frameCount = 0;
+	glm::vec3 color {0};
+
+	glm::vec2 output;
 	while (!glfwWindowShouldClose(window))
 	{
+		baseShader.setVec2("tileScale", tileMap.tileScale);
+		tileMap.calcTileValues(winWidth, winHeight);
 		processUserInput(window);
-		tileMap.calculateTileScale(winWidth, winHeight);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-		uint8_t i = 0;
-		
-		for (uint8_t x = 0; x < tileMap.width; x++)
+
+		frameCount++;
+
+		if ((glfwGetTime() - lastFrame) >= 1.0f)
 		{
-			for (uint8_t y = 0; y < tileMap.height; y++)
+			cout << "fps: " << frameCount << endl;
+			frameCount = 0;
+			lastFrame = glfwGetTime();
+		}
+
+		for (x = 0; x < tileMap.width; x++)
+		{
+			output.x = tileMap.tileScale.x * (x * 2.0f) - tileMap.tileDist.x;	//set x coordinate of translation
+			for (y = 0; y < tileMap.height; y++)
 			{
-				baseShader.setVec2("translation", glm::vec2(tileMap.tileScale.x * (x * 2.0f) - (tileMap.tileScale.x * (tileMap.width - 1)), tileMap.tileScale.y * (y * 2.0f) - (tileMap.tileScale.y * (tileMap.height - 1))));
-				baseShader.setVec2("tileScale", tileMap.tileScale);
-				baseShader.setVec3("col", colList[i]);
-				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);	
-				i = (i + 1) % 4;
+				output.y = tileMap.tileScale.y * (y * 2.0f) - tileMap.tileDist.y;	//set y coordinate of translation
+				color = colList[tileMap.MapPtr[(y * tileMap.width) + x]];	//get color
+				glUniform2f(glGetUniformLocation(baseShader.ID, "translation"), output.x, output.y);	//set Translation uniform
+				glUniform3f(glGetUniformLocation(baseShader.ID, "col"), color.x, color.y, color.z);	//set color
+				//baseShader.setVec3("col", colList[tileMap.GetTile(x, y)]);
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 			}
 		}
-		baseShader.setVec2("translation", glm::vec2(-0.0f, -0.0f));
-		baseShader.setVec2("tileScale", glm::vec2(tileMap.tileScale.x, 0.1f));
-		baseShader.setVec3("col", glm::vec3(0.0f, 0.0f, 0.0f));
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);	
-		//
-		//baseShader.setVec2("translation", glm::vec2(-0.5f, 0.5f));
-		//baseShader.setVec2("tileScale", tileMap.tileScale);
-		//baseShader.setVec3("col", glm::vec3(0.0f, 1.0f, 0.0f));
-		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		//
-		//baseShader.setVec2("translation", glm::vec2(0.5f, -0.5f));
-		//baseShader.setVec2("tileScale", tileMap.tileScale);
-		//baseShader.setVec3("col", glm::vec3(0.0f, 0.0f, 1.0f));
-		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
@@ -178,24 +200,33 @@ TileMap::TileMap(uint16_t Width, uint16_t Height)
 	float mapRatio = (float)Width / (float)Height;
 	float winRatio = (float)START_WIDTH / (float)START_HEIGHT;
 
-	if (mapRatio > winRatio)	//set scale
+	if (mapRatio < winRatio)	//set scale
 	{
 		tileScale.x = (1.0f / Height);
 		tileScale.y = (1.0f / Height);
-		tileScale.x /= winRatio;	//compensate for non square window;
 	}
 	else
 	{
 		tileScale.x = (1.0f / Width);
 		tileScale.y = (1.0f / Width);
-		tileScale.x /= winRatio;	//compensate for non square window;
 	}
 
+	if (winRatio > 1.0f)
+	{
+		tileScale.x /= winRatio;	//compensate for non square window;
+	}
+	else if (winRatio < 1.0f)
+	{
+		tileScale.y *= winRatio;	//compensate for non square window;
+	}
+
+	tileDist.x = tileScale.x * (Width - 1);	//set distance between tiles on x axis
+	tileDist.y = tileScale.y * (Height - 1);	//set distance between tiles on y axis
 
 	width = Width;
 	height = Height;
 
-	MapPtr = new uint8_t[(uint32_t)(Width * height)]{0};
+	MapPtr = new uint8_t[(uint32_t)(Width * Height)]{0};
 }
 
 TileMap::~TileMap()
@@ -222,7 +253,7 @@ uint8_t TileMap::GetTile(uint16_t x, uint16_t y)
 	return MapPtr[(y * width) + x];
 }
 
-void TileMap::calculateTileScale(uint16_t windowWidth, uint16_t windowHeight)
+void TileMap::calcTileValues(uint16_t windowWidth, uint16_t windowHeight)
 {
 	float mapRatio = (float)width / (float)height;
 	float winRatio = (float)windowWidth / (float)windowHeight;
@@ -231,23 +262,24 @@ void TileMap::calculateTileScale(uint16_t windowWidth, uint16_t windowHeight)
 	{
 		tileScale.x = (1.0f / height);
 		tileScale.y = (1.0f / height);
-			//compensate for non square window;
 	}
 	else
 	{
 		tileScale.x = (1.0f / width);
 		tileScale.y = (1.0f / width);
-			//compensate for non square window;
 	}
 
 	if (winRatio > 1.0f)
 	{
-		tileScale.x /= winRatio;
+		tileScale.x /= winRatio;	//compensate for non square window;
 	}
 	else if (winRatio < 1.0f)
 	{
-		tileScale.y *= winRatio;
+		tileScale.y *= winRatio;	//compensate for non square window;
 	}
+
+	tileDist.x = tileScale.x * (width - 1);	//set distance between tiles on x axis
+	tileDist.y = tileScale.y * (height - 1);	//set distance between tiles on y axis
 }
 
 void TileMap::SetTile(uint16_t x, uint16_t y, uint8_t tileID)
