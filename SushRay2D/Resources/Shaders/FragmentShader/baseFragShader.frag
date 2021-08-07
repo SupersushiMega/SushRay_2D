@@ -38,7 +38,7 @@ void main()
 			}
 		}
 	}
-	staticLightColAverage += 0.3;
+	//staticLightColAverage += 0.3;
 	staticLightColAverage /= 9;
 	//=====================================================================================
 	FragColor = staticLightColAverage * vec4(col, 1.0);

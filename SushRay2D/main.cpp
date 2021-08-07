@@ -67,11 +67,18 @@ class StaticLightMap
 public:
 	StaticLightMap(uint16_t width, uint16_t height);
 	
-	void calcLightMap(vector<Light> lights, TileMap& tileMap);
+	void bindTileMap(TileMap& tileMap);
+	void calcLightMap(vector<Light> lights);
+	void castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& startCol, glm::vec3& lightFalloff, float range, uint8_t bounceCnt);
 
 	uint16_t width;
 	uint16_t height;
+
+	glm::vec2 lightTileRatio;
 	glm::vec3* mapPtr = nullptr;
+	TileMap* tileMapPtr = nullptr;
+
+	uint8_t maxRayBounce = 4;
 };
 
 	vector<Light> lightList;
@@ -101,7 +108,7 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);	//
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);	//set openGL profile to core
 
-	GLFWwindow* window = glfwCreateWindow(START_WIDTH, START_HEIGHT, "Sush2D", NULL, NULL);	//create window
+	GLFWwindow* window = glfwCreateWindow(START_WIDTH, START_HEIGHT, "SushRay2D", NULL, NULL);	//create window
 	if (window == NULL)	//check for failed window creation
 	{
 		cout << "GLFW ERROR: Window creation failed" << endl;
@@ -155,7 +162,8 @@ int main()
 	//static light map setup
 	//==============================================================================================
 	StaticLightMap staticLightMap(600, 600);
-	staticLightMap.calcLightMap(lightList, tileMap);
+	staticLightMap.bindTileMap(tileMap);
+	staticLightMap.calcLightMap(lightList);
 	unsigned int staticLightMapObject;
 	float borderCol[] = { 1.0f, 0.0f, 0.0f, 0.0f };	//color outside of map (displayed only when something is displayed outside of map)
 	glGenTextures(1, &staticLightMapObject);
@@ -198,6 +206,7 @@ int main()
 	glm::vec3 color {0};
 
 	glm::vec2 output;
+
 	while (!glfwWindowShouldClose(window))
 	{
 		baseShader.setVec2("tileScale", tileMap.tileScale);
@@ -206,7 +215,7 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
-		staticLightMap.calcLightMap(lightList, tileMap);
+		staticLightMap.calcLightMap(lightList);
 		glBindTexture(GL_TEXTURE_2D, staticLightMapObject);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
 
@@ -397,7 +406,14 @@ StaticLightMap::StaticLightMap(uint16_t Width, uint16_t Height)
 	}
 }
 
-void StaticLightMap::calcLightMap(vector<Light> lights, TileMap& tileMap)
+void StaticLightMap::bindTileMap(TileMap& tileMap)
+{
+	tileMapPtr = &tileMap;
+	lightTileRatio.x = width / tileMapPtr->width;	//the ratio of the x axis in the light map to the x axis of the tile map
+	lightTileRatio.y = height / tileMapPtr->height;	//the ratio of the y axis in the light map to the y axis of the tile map
+}
+
+void StaticLightMap::calcLightMap(vector<Light> lights)
 {
 	uint8_t lightID;
 	uint32_t rayCntr;
@@ -405,15 +421,13 @@ void StaticLightMap::calcLightMap(vector<Light> lights, TileMap& tileMap)
 	float angleDelta;
 	float angle;
 	glm::vec3 lightFalloff;
-	glm::vec2 deltaXY;
 	glm::vec3 lightCol;
 	glm::vec2 rayPos;
 	
 	uint16_t rayPosFloor_X;
 	uint16_t rayPosFloor_Y;
-
-	uint16_t LightTileRatio_X = width / tileMap.width;	//the ratio of the x axis in the light map to the x axis of the tile map
-	uint16_t LightTileRatio_Y = height / tileMap.height;	//the ratio of the y axis in the light map to the y axis of the tile map
+	
+	glm::vec2 DeltaXY;
 
 	for (uint32_t i = 0; i < (width * height); i++)	//set map to 0
 	{
@@ -426,57 +440,118 @@ void StaticLightMap::calcLightMap(vector<Light> lights, TileMap& tileMap)
 		angleDelta = (2 * PI) / lights[lightID].raycount;
 		lightCol = lights[lightID].color * lights[lightID].intensity;
 		lightFalloff = lightCol / glm::vec3(lights[lightID].range);
-
-
 		for (rayCntr = 0; rayCntr < lights[lightID].raycount; rayCntr++)
 		{
-			deltaXY.x = sin(angle);
-			deltaXY.y = cos(angle);
-			rayPos = lights[lightID].location;
-
-			for (rayDistCntr = 0; rayDistCntr < lights[lightID].range; rayDistCntr++)
-			{
-				//break if outside of map
-				//=================
-				if (rayPos.y >= height || rayPos.y < 0)
-				{
-					break;
-				}
-				else if (rayPos.x >= width || rayPos.x < 0)
-				{
-					break;
-				}
-				//=================
-				rayPosFloor_X = floor(rayPos.x);
-				rayPosFloor_Y = floor(rayPos.y);
-
-				if (tileMap.GetTile(floor(rayPos.x / LightTileRatio_X), floor(rayPos.y / LightTileRatio_Y)) == 0)	//check for solid tile
-				{
-					break;
-				}
-				
-				mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)] += lightCol - (lightFalloff * glm::vec3(rayDistCntr));	//add light to pixel
-				
-				//Clamping
-				//================================================================
-				if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].x > 1.0f)
-				{										   
-					mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].x = 1.0f;
-				}
-
-				if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].y > 1.0f)
-				{
-					mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].y = 1.0f;
-				}
-
-				if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].z > 1.0f)
-				{
-					mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].z = 1.0f;
-				}
-				//================================================================
-				rayPos += deltaXY;
-			}
+			DeltaXY.x = sin(angle);
+			DeltaXY.y = cos(angle);
+			castRay(lights[lightID].location, DeltaXY, lightCol, lightFalloff, lights[lightID].range, 0);
 			angle += angleDelta;
 		}
 	}
+}
+
+void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& startCol, glm::vec3& lightFalloff, float range, uint8_t bounceCnt)
+{
+
+	bounceCnt++;
+
+	uint32_t rayDistCntr;
+	uint16_t rayPosFloor_X;
+	uint16_t rayPosFloor_Y;
+
+	uint16_t tileMapX;
+	uint16_t tileMapY;
+
+	float TileX;
+	float TileY;
+
+	glm::vec3 lightCol = startCol;
+
+	while (range > 0)
+	{
+		//break if outside of map
+		//=================
+		if (rayPos.y >= height || rayPos.y < 0)
+		{
+			return;
+		}
+		else if (rayPos.x >= width || rayPos.x < 0)
+		{
+			return;
+		}
+		//=================
+
+		rayPosFloor_X = floor(rayPos.x);
+		rayPosFloor_Y = floor(rayPos.y);
+
+		tileMapX = floor(rayPos.x / lightTileRatio.x);
+		tileMapY = floor(rayPos.y / lightTileRatio.y);
+
+		if (tileMapPtr->mapPtr[(tileMapY * tileMapPtr->width) + tileMapX] == 0)	//check for solid tile
+		{
+			if (bounceCnt < maxRayBounce)
+			{
+				TileX = abs(((rayPos.x - (lightTileRatio.x / 2)) / lightTileRatio.x) - tileMapX);
+				TileY = abs(((rayPos.y - (lightTileRatio.y / 2)) / lightTileRatio.y) - tileMapY);
+				glm::vec3 col1(0.0f, 0.2f, 0.0f);
+				glm::vec3 col2(0.2f, 0.0f, 0.0f);
+				if (TileX < TileY)
+				{
+					castRay(rayPos - deltaXY, glm::vec2(deltaXY.x, -deltaXY.y), lightCol, lightFalloff, range, bounceCnt);
+					return;
+				}
+				else if (TileX > TileY)
+				{
+					castRay(rayPos - deltaXY, glm::vec2(-deltaXY.x, deltaXY.y), lightCol, lightFalloff, range, bounceCnt);
+					return;
+				}
+				else
+				{
+					return;
+				}
+			}
+			else
+			{
+				return;
+			}
+		}
+
+
+		mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)] += lightCol;	//add light to pixel
+		rayPos += deltaXY;
+		lightCol -= lightFalloff;	//calculate new light color
+		range--;
+		//Clamping
+		//================================================================
+		if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].x > 1.0f)
+		{
+			mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].x = 1.0f;
+		}
+		else if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].x < 0.0f)
+		{
+			mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].x = 0.0f;
+		}
+		
+		
+		if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].y > 1.0f)
+		{
+			mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].y = 1.0f;
+		}
+		else if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].y < 0.0f)
+		{
+			mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].y = 0.0f;
+		}
+		
+		
+		if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].z > 1.0f)
+		{
+			mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].z = 1.0f;
+		}
+		else if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].z < 0.0f)
+		{
+			mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].z = 0.0f;
+		}
+		//================================================================
+	}
+	return;
 }
