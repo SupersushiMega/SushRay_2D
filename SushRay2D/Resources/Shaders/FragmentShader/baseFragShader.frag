@@ -5,7 +5,7 @@ in vec2 texCoord;
 
 out vec4 FragColor;
 
-uniform vec3 col;
+uniform int tileID;
 
 //(float per Pixel) how much 1 pixel is in the 0.0 to 1.0 coordinate system of the static light map on the x and y axis
 uniform float fperPix_X;
@@ -15,8 +15,11 @@ uniform float fperPix_Y;
 uniform float fperTileX;
 uniform float fperTileY;
 
-uniform sampler2D tileSet; 
-uniform sampler2D staticLightMap;
+uniform bool hasAlpha;
+
+uniform sampler2D staticLightMap;	//texture0
+uniform sampler2D dynamicLightMap;	//texture1
+uniform sampler2D tileSetColor;		//texture2
 
 void main()
 {
@@ -45,5 +48,5 @@ void main()
 	//staticLightColAverage += 0.3;
 	staticLightColAverage /= 9;
 	//=====================================================================================
-	FragColor = staticLightColAverage * vec4(col, 1.0);
+	FragColor = texture(tileSetColor, vec2(texCoord.x / 3, texCoord.y)) * staticLightColAverage;
 }

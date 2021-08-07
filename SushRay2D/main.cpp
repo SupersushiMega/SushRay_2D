@@ -4,11 +4,15 @@
 //===============================
 
 #include <iostream>
+#include <string>
 #include <math.h>
 #include <vector>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <ShaderLoader/ShaderLoader.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image/stb_image.h>
 
 const float TILE_VERT[] = {
  1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
@@ -36,6 +40,34 @@ const double PI = 2 * acos(0.0f);
 uint16_t winWidth = 1000;
 uint16_t winHeight = 1000;
 
+
+//TileSets
+//=========================================================================================================
+//Requires 2 tileSets: Color: how a tile looks and how transparent the tile is based on the alpha channel, Roughness: indicates how reflective a tile is. (Transparency and Roughness use only the outer edges of the Tiles) works without alpha channel(Transparency), Pixeart must be quite large for useable results
+/*the tiles are given IDs starting from the top left corner in the following order :  0,  1,  2,  3,
+*																					  4,  5,  6,  7,
+*																					  8,  9, 10, 11,
+*																					 12, 13, 14, 15 */
+class TileSet
+{
+public:
+	TileSet(const char *PathColor, const char *PathRoughness, uint8_t NrTilesX, uint8_t NrTilesY, shader& shader);
+	~TileSet();
+	int32_t Color_width;
+	int32_t Color_height;
+	int32_t Color_nrChannels;
+
+	int32_t Roughness_width;
+	int32_t Roughness_height;
+	int32_t Roughness_nrChannels;
+
+	uint8_t nrTilesX;
+	uint8_t nrTilesY;
+	unsigned char* ColorPtr = nullptr;
+	unsigned char* RoughnessPtr = nullptr;
+	unsigned int tileSetColor;	//Texture used by openGL
+};
+
 class TileMap
 {
 public:
@@ -54,7 +86,8 @@ public:
 class Light
 {
 public:
-	Light(glm::vec2 Location, uint16_t Range, glm::vec3 Color, float Intensitiy, float RayMult);	//rayMult inicates what multiple of the minimal amount of rays needed for the given range is used
+	Light(glm::vec2 Location, uint16_t Range, glm::vec3 Color, float Intensitiy, float RayMult);	//rayMult indicates what multiple of the minimal amount of rays needed for the given range is used
+	~Light();
 	glm::vec2 location;
 	glm::vec3 color;
 	uint16_t range;
@@ -66,9 +99,10 @@ class StaticLightMap
 {
 public:
 	StaticLightMap(uint16_t width, uint16_t height);
+	~StaticLightMap();
 	
 	void bindTileMap(TileMap& tileMap);
-	void calcLightMap(vector<Light> lights);
+	void updateLightMap(vector<Light>& lights);
 	void castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& startCol, glm::vec3& lightFalloff, float range, uint8_t bounceCnt);
 
 	uint16_t width;
@@ -79,6 +113,8 @@ public:
 	TileMap* tileMapPtr = nullptr;
 
 	uint8_t maxRayBounce = 4;
+
+	unsigned int staticLightMap;	//Texture used by openGL
 };
 
 	vector<Light> lightList;
@@ -129,6 +165,11 @@ int main()
 
 	//load shaders
 	shader baseShader("Resources/Shaders/VertexShader/baseVertShader.vert", "Resources/Shaders/FragmentShader/baseFragShader.frag");
+	
+	
+
+	//load tileset
+	TileSet tileSet("Resources/Textures/TileTest.png", "Resources/Textures/TestTiles3x1.png_roughness", 3, 1, baseShader);
 
 	//vertex buffer object
 	unsigned int VBO;	//Vertex buffer object
@@ -163,29 +204,7 @@ int main()
 	//==============================================================================================
 	StaticLightMap staticLightMap(600, 600);
 	staticLightMap.bindTileMap(tileMap);
-	staticLightMap.calcLightMap(lightList);
-	unsigned int staticLightMapObject;
-	float borderCol[] = { 1.0f, 0.0f, 0.0f, 0.0f };	//color outside of map (displayed only when something is displayed outside of map)
-	glGenTextures(1, &staticLightMapObject);
-	glBindTexture(GL_TEXTURE_2D, staticLightMapObject);
-	
-	//set textures to clamp to border
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-
-	//set border color
-	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderCol);
-
-	//set filtering
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);	//set nearest filter for minifying
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	//set linear filter for magnifying
-
-	//get data
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
-	
-	//generate mipmap
-	glGenerateMipmap(GL_TEXTURE_2D);
-	//==============================================================================================
+	staticLightMap.updateLightMap(lightList);
 
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);	//set clear color	
 
@@ -199,13 +218,19 @@ int main()
 		glm::vec3(0.8f, 0.8f, 0.8f),
 	};
 	
-	float lastFrame = 0.0f;
+	double lastFrame = 0.0f;
 	float xTrans = 0.0f;
 
 	uint16_t frameCount = 0;
 	glm::vec3 color {0};
 
 	glm::vec2 output;
+
+	//sampler setup
+	baseShader.use();
+	baseShader.setInt("staticLightMap", 0);
+	baseShader.setInt("dynamicLightMap", 1);
+	baseShader.setInt("tileSetColor", 2);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -215,9 +240,14 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
-		staticLightMap.calcLightMap(lightList);
-		glBindTexture(GL_TEXTURE_2D, staticLightMapObject);
+		staticLightMap.updateLightMap(lightList);
+
+		//send data 
+		glActiveTexture(GL_TEXTURE0);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
+		glBindTexture(GL_TEXTURE_2D, staticLightMap.staticLightMap);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, tileSet.tileSetColor);
 
 		frameCount++;
 
@@ -234,9 +264,8 @@ int main()
 			for (y = 0; y < tileMap.height; y++)
 			{
 				output.y = tileMap.tileScale.y * (y * 2.0f) - tileMap.tileDist.y;	//set y coordinate of translation
-				color = colList[tileMap.mapPtr[(y * tileMap.width) + x]];	//get color
 				glUniform2f(glGetUniformLocation(baseShader.ID, "translation"), output.x, output.y);	//set Translation uniform
-				glUniform3f(glGetUniformLocation(baseShader.ID, "col"), color.x, color.y, color.z);	//set color
+				glUniform1i(glGetUniformLocation(baseShader.ID, "tileID"), tileMap.mapPtr[(y * tileMap.width) + x]);	//set tîleID
 				//baseShader.setVec3("col", colList[tileMap.GetTile(x, y)]);
 				glDrawElements(GL_TRIANGLES, 8, GL_UNSIGNED_INT, 0);
 			}
@@ -279,6 +308,77 @@ void processUserInput(GLFWwindow* window)
 	{
 		lightList[0].location.x -= 0.5f;
 	}
+}
+
+TileSet::TileSet(const char *PathColor, const char *PathRoughness, uint8_t NrTilesX, uint8_t NrTilesY, shader &shader)
+{
+	ColorPtr = stbi_load(PathColor, &Color_width, &Color_height, &Color_nrChannels, 0);
+	RoughnessPtr = stbi_load(PathRoughness, &Roughness_width, &Roughness_height, &Roughness_nrChannels, 0);
+	nrTilesX = NrTilesX;
+	nrTilesY = NrTilesY;
+
+	shader.setFloat("fperTileX", 1.0f / NrTilesX);
+	shader.setFloat("fperTileY", 1.0f / NrTilesY);
+
+	if (!RoughnessPtr)
+	{
+		cout << "ERROR: Roughness Tileset failed to load" << endl;
+	}
+
+	if (ColorPtr)
+	{
+		shader.use();
+		//Color Tileset setup
+		//==============================================================================================
+		float borderCol[] = { 1.0f, 0.0f, 0.0f, 0.0f };	//color outside of map (displayed only when something is displayed outside of map)
+		glGenTextures(1, &tileSetColor);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, tileSetColor);
+
+		//set textures to clamp to border
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+		//set border color
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderCol);
+
+		//set filtering
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);	//set nearest filter for minifying
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);	//set linear filter for magnifying
+
+		//get data
+		glActiveTexture(GL_TEXTURE2);
+		if (Color_nrChannels == 4)	//has alpha channel
+		{
+			shader.setBool("hasAlpha", true);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Color_width, Color_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, ColorPtr);
+		}
+		else if (Color_nrChannels == 3)	//does not have alpha channel (no transparency)
+		{
+			shader.setBool("hasAlpha", false);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Color_width, Color_height, 0, GL_RGB, GL_UNSIGNED_BYTE, ColorPtr);
+		}
+		else
+		{
+			cout << "ERROR: Color Tileset color format not compatible. Must be either RGB or RGBA" << endl;
+		}
+
+		//generate mipmap
+		glGenerateMipmap(GL_TEXTURE_2D);
+		//==============================================================================================
+	}
+	else
+	{
+		cout << "ERROR: Color Tileset failed to load" << endl;
+	}
+}
+
+TileSet::~TileSet()
+{
+	delete[] ColorPtr;
+	delete[] RoughnessPtr;
+	ColorPtr = nullptr;
+	RoughnessPtr = nullptr;
 }
 
 TileMap::TileMap(uint16_t Width, uint16_t Height)
@@ -392,18 +492,56 @@ Light::Light(glm::vec2 Location, uint16_t Range, glm::vec3 Color, float Intensit
 	range = Range;
 	color = Color;
 	intensity = Intensity;
-	raycount = floor((2 * PI * Range) * RayMult);
+	raycount = (uint32_t)floor((2 * PI * Range) * RayMult);
+}
+
+Light::~Light()
+{
+
 }
 
 StaticLightMap::StaticLightMap(uint16_t Width, uint16_t Height)
 {
+	
 	width = Width;
 	height = Height;
 	mapPtr = new glm::vec3[width * height];
-	for (uint32_t i = 0; i < (width * height); i++)	//set map to 0
+	for (uint32_t i = 0; i < (uint32_t)(width * height); i++)	//set map to 0
 	{
 		mapPtr[i] = glm::vec3(0.0f);
 	}
+
+	//light map setup
+	//==============================================================================================
+	float borderCol[] = { 1.0f, 0.0f, 0.0f, 0.0f };	//color outside of map (displayed only when something is displayed outside of map)
+	glGenTextures(1, &staticLightMap);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, staticLightMap);
+
+	//set textures to clamp to border
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	//set border color
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderCol);
+
+	//set filtering
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);	//set nearest filter for minifying
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	//set linear filter for magnifying
+
+	//get data
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, mapPtr);
+
+	//generate mipmap
+	glGenerateMipmap(GL_TEXTURE_2D);
+	//==============================================================================================
+}
+
+StaticLightMap::~StaticLightMap()
+{
+	delete[] mapPtr;
+	mapPtr = nullptr;
+	tileMapPtr = nullptr;
 }
 
 void StaticLightMap::bindTileMap(TileMap& tileMap)
@@ -413,23 +551,19 @@ void StaticLightMap::bindTileMap(TileMap& tileMap)
 	lightTileRatio.y = height / tileMapPtr->height;	//the ratio of the y axis in the light map to the y axis of the tile map
 }
 
-void StaticLightMap::calcLightMap(vector<Light> lights)
+void StaticLightMap::updateLightMap(vector<Light>& lights)
 {
 	uint8_t lightID;
 	uint32_t rayCntr;
-	uint16_t rayDistCntr;
 	float angleDelta;
 	float angle;
 	glm::vec3 lightFalloff;
 	glm::vec3 lightCol;
 	glm::vec2 rayPos;
 	
-	uint16_t rayPosFloor_X;
-	uint16_t rayPosFloor_Y;
-	
 	glm::vec2 DeltaXY;
 
-	for (uint32_t i = 0; i < (width * height); i++)	//set map to 0
+	for (uint32_t i = 0; i < (uint32_t)(width * height); i++)	//set map to 0
 	{
 		mapPtr[i] = glm::vec3(0.0f);
 	}
@@ -448,6 +582,8 @@ void StaticLightMap::calcLightMap(vector<Light> lights)
 			angle += angleDelta;
 		}
 	}
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, staticLightMap);
 }
 
 void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& startCol, glm::vec3& lightFalloff, float range, uint8_t bounceCnt)
@@ -455,7 +591,6 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 
 	bounceCnt++;
 
-	uint32_t rayDistCntr;
 	uint16_t rayPosFloor_X;
 	uint16_t rayPosFloor_Y;
 
@@ -486,12 +621,12 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 		}
 		//=================
 
-		rayPosFloor_X = floor(rayPos.x);
-		rayPosFloor_Y = floor(rayPos.y);
+		rayPosFloor_X = (uint16_t)floor(rayPos.x);
+		rayPosFloor_Y = (uint16_t)floor(rayPos.y);
 
 		//calculate the xy coordinates of the ray on the tile map
-		tileMapX = floor(rayPos.x / lightTileRatio.x);
-		tileMapY = floor(rayPos.y / lightTileRatio.y);
+		tileMapX = (uint16_t)floor(rayPos.x / lightTileRatio.x);
+		tileMapY = (uint16_t)floor(rayPos.y / lightTileRatio.y);
 
 		if (tileMapPtr->mapPtr[(tileMapY * tileMapPtr->width) + tileMapX] == 0)	//check for solid tile
 		{
@@ -530,7 +665,11 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 			else
 			{
 				//check if the light has gone far enough in the tile to be stopped (number indicates distance from center and ranges from 0.01(middle) to 0.5(outer edge))(WARNING: LOW VALUES LEAD TO UNRELIABILITY)
-				float dist = 0.1f;
+				float dist = 0.2f;
+				if(!(Yenter || Xenter))
+				{
+					return;
+				}
 				if (Yenter)
 				{
 					if (TileX < dist)
