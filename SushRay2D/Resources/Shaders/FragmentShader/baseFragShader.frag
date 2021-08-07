@@ -11,14 +11,18 @@ uniform vec3 col;
 uniform float fperPix_X;
 uniform float fperPix_Y;
 
-uniform sampler2D staticLightMap;
+//(float per Tile) the distance in the 0.0 to 1.0 coordinate system of the Tileset which is equivalent to 1 tile in the x and y axis
+uniform float fperTileX;
+uniform float fperTileY;
 
-vec4 staticLightColAverage; 
+uniform sampler2D tileSet; 
+uniform sampler2D staticLightMap;
 
 void main()
 {
 	//get average color of current pixel and the 8 pixels around it on the static light map
 	//=====================================================================================
+	vec4 staticLightColAverage; 
 	int x = 0;
 	int y = 0;
 	float Xpos = 0;

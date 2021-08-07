@@ -54,7 +54,7 @@ public:
 class Light
 {
 public:
-	Light(glm::vec2 Location, uint16_t Range, glm::vec3 Color, float Intensitiy, uint16_t RayMult);	//rayMult inicates what multiple of the minimal amount of rays needed for the given range is used
+	Light(glm::vec2 Location, uint16_t Range, glm::vec3 Color, float Intensitiy, float RayMult);	//rayMult inicates what multiple of the minimal amount of rays needed for the given range is used
 	glm::vec2 location;
 	glm::vec3 color;
 	uint16_t range;
@@ -82,7 +82,7 @@ public:
 };
 
 	vector<Light> lightList;
-	Light tempLight(glm::vec2(300, 300), 100, glm::vec3(1.0f, 1.0f, 1.0f), 0.1f, 1);
+	Light tempLight(glm::vec2(300, 300), 100, glm::vec3(1.0f, 1.0f, 1.0f), 0.1f, 1.0f);
 
 int main()
 {
@@ -386,13 +386,13 @@ void TileMap::calcTileValues(uint16_t windowWidth, uint16_t windowHeight)
 	tileDist.y = tileScale.y * (height - 1);	//set distance between tiles on y axis
 }
 
-Light::Light(glm::vec2 Location, uint16_t Range, glm::vec3 Color, float Intensity, uint16_t RayMult)
+Light::Light(glm::vec2 Location, uint16_t Range, glm::vec3 Color, float Intensity, float RayMult)
 {
 	location = Location;
 	range = Range;
 	color = Color;
 	intensity = Intensity;
-	raycount = (2 * PI * Range) * RayMult;
+	raycount = floor((2 * PI * Range) * RayMult);
 }
 
 StaticLightMap::StaticLightMap(uint16_t Width, uint16_t Height)
@@ -465,6 +465,11 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 	float TileX;
 	float TileY;
 
+	bool insideTile = false;
+
+	bool Yenter = false;
+	bool Xenter = false;
+
 	glm::vec3 lightCol = startCol;
 
 	while (range > 0)
@@ -484,26 +489,38 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 		rayPosFloor_X = floor(rayPos.x);
 		rayPosFloor_Y = floor(rayPos.y);
 
+		//calculate the xy coordinates of the ray on the tile map
 		tileMapX = floor(rayPos.x / lightTileRatio.x);
 		tileMapY = floor(rayPos.y / lightTileRatio.y);
 
 		if (tileMapPtr->mapPtr[(tileMapY * tileMapPtr->width) + tileMapX] == 0)	//check for solid tile
 		{
-			if (bounceCnt < maxRayBounce)
+			//calculate the xy coordinates inside the tile
+			TileX = abs(((rayPos.x - (lightTileRatio.x / 2)) / lightTileRatio.x) - tileMapX);
+			TileY = abs(((rayPos.y - (lightTileRatio.y / 2)) / lightTileRatio.y) - tileMapY);
+
+			if (TileX < TileY)	//check if the collision on the side left or right of the tile
 			{
-				TileX = abs(((rayPos.x - (lightTileRatio.x / 2)) / lightTileRatio.x) - tileMapX);
-				TileY = abs(((rayPos.y - (lightTileRatio.y / 2)) / lightTileRatio.y) - tileMapY);
-				glm::vec3 col1(0.0f, 0.2f, 0.0f);
-				glm::vec3 col2(0.2f, 0.0f, 0.0f);
-				if (TileX < TileY)
+				Xenter = true;
+			}
+			else if (TileX > TileY)	//check if the collision on the side top or bottom of the tile
+			{
+				Yenter = true;
+			}
+			else
+			{
+				return;
+			}
+
+			if ((bounceCnt < maxRayBounce) && !insideTile)
+			{
+				if (Xenter)	//check if the collision on the side left or right of the tile
 				{
-					castRay(rayPos - deltaXY, glm::vec2(deltaXY.x, -deltaXY.y), lightCol, lightFalloff, range, bounceCnt);
-					return;
+					castRay(rayPos - deltaXY, glm::vec2(deltaXY.x, -deltaXY.y), lightCol, lightFalloff, range, bounceCnt);;
 				}
-				else if (TileX > TileY)
+				else if (Yenter)	//check if the collision on the side top or bottom of the tile
 				{
 					castRay(rayPos - deltaXY, glm::vec2(-deltaXY.x, deltaXY.y), lightCol, lightFalloff, range, bounceCnt);
-					return;
 				}
 				else
 				{
@@ -512,8 +529,28 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 			}
 			else
 			{
-				return;
+				//check if the light has gone far enough in the tile to be stopped (number indicates distance from center and ranges from 0.01(middle) to 0.5(outer edge))(WARNING: LOW VALUES LEAD TO UNRELIABILITY)
+				float dist = 0.1f;
+				if (Yenter)
+				{
+					if (TileX < dist)
+					{
+						return;
+					}
+				}
+				if (Xenter)
+				{
+					if (TileY < dist)
+					{
+						return;
+					}
+				}
 			}
+			insideTile = true;
+		}
+		else if(insideTile)
+		{
+			return;
 		}
 
 
