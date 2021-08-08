@@ -12,14 +12,15 @@ uniform float fperPix_X;
 uniform float fperPix_Y;
 
 //(float per Tile) the distance in the 0.0 to 1.0 coordinate system of the Tileset which is equivalent to 1 tile in the x and y axis
-uniform float fperTileX;
-uniform float fperTileY;
+uniform int nrTilesX;
+uniform int nrTilesY;
 
 uniform bool hasAlpha;
 
 uniform sampler2D staticLightMap;	//texture0
 uniform sampler2D dynamicLightMap;	//texture1
 uniform sampler2D tileSetColor;		//texture2
+
 
 void main()
 {
@@ -30,6 +31,23 @@ void main()
 	int y = 0;
 	float Xpos = 0;
 	float Ypos = 0;
+	vec2 tileXY;
+
+	//offset																		  //scaling of texture coordinates to 1 tile
+	//============================================================================	  //=====================
+	tileXY.x = (1.0 / float(nrTilesX)) * (tileID - floor(float(tileID) / nrTilesX)) + (texCoord.x / nrTilesX);	//calculate the x coordinate of the current tile on the tileset
+	
+	if(floor(float(tileID) / nrTilesX) > 0.0)	//check to ensure that there is no division by 0
+	{
+		//offset															   //scaling of texture coordinates to 1 tile
+		//=================================================================	   //=====================
+		tileXY.y = (1.0 / float(nrTilesY)) * floor(float(tileID) / nrTilesX) + (texCoord.y / nrTilesY);	//calculate the y coordinate of the current tile on the tileset
+	}
+	else
+	{
+		tileXY.y = 0.0 + (texCoord.y / nrTilesY);	//set y coordinate on tilemap to 0 plus the current texture coordinates of the y axis
+	}
+
 	for(x = 0; x < 3; x++)
 	{
 		Xpos = fragPos.x - ((fperPix_X * x) - fperPix_X);
@@ -48,5 +66,6 @@ void main()
 	//staticLightColAverage += 0.3;
 	staticLightColAverage /= 9;
 	//=====================================================================================
-	FragColor = texture(tileSetColor, vec2(texCoord.x / 3, texCoord.y)) * staticLightColAverage;
+	//FragColor = texture(tileSetColor, vec2((texCoord.x / 3) + (1.0 / 3) * 2, texCoord.y)) * staticLightColAverage;
+	FragColor = texture(tileSetColor, tileXY) * staticLightColAverage;
 }

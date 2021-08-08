@@ -118,7 +118,8 @@ public:
 };
 
 	vector<Light> lightList;
-	Light tempLight(glm::vec2(300, 300), 100, glm::vec3(1.0f, 1.0f, 1.0f), 0.1f, 1.0f);
+	Light tempLight(glm::vec2(300, 300), 100, glm::vec3(0.5f, 0.5f, 0.5f), 0.1f, 1.0f);
+	Light tempLight2(glm::vec2(300, 300), 100, glm::vec3(1.0f, 0.0f, 0.0f), 10.0f, 0.01f);
 
 int main()
 {
@@ -129,6 +130,7 @@ int main()
 
 
 	lightList.push_back(tempLight);
+	lightList.push_back(tempLight2);
 
 	for (x = 0; x < 25; x++)
 	{
@@ -169,7 +171,7 @@ int main()
 	
 
 	//load tileset
-	TileSet tileSet("Resources/Textures/TileTest.png", "Resources/Textures/TestTiles3x1.png_roughness", 3, 1, baseShader);
+	TileSet tileSet("Resources/Textures/TestTiles3x1.png", "Resources/Textures/TestTiles3x1.png_roughness", 3, 1, baseShader);
 
 	//vertex buffer object
 	unsigned int VBO;	//Vertex buffer object
@@ -213,6 +215,9 @@ int main()
 	baseShader.setFloat("fperPix_X", 1.0f / staticLightMap.width);
 	baseShader.setFloat("fperPix_Y", 1.0f / staticLightMap.height);
 
+	baseShader.setInt("nrTilesX", tileSet.nrTilesX);
+	baseShader.setInt("nrTilesY", tileSet.nrTilesY);
+
 	glm::vec3 colList[] = {
 		glm::vec3(0.4f, 0.2f, 0.1f),
 		glm::vec3(0.8f, 0.8f, 0.8f),
@@ -232,6 +237,8 @@ int main()
 	baseShader.setInt("dynamicLightMap", 1);
 	baseShader.setInt("tileSetColor", 2);
 
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, tileSet.tileSetColor);
 	while (!glfwWindowShouldClose(window))
 	{
 		baseShader.setVec2("tileScale", tileMap.tileScale);
@@ -246,8 +253,6 @@ int main()
 		glActiveTexture(GL_TEXTURE0);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
 		glBindTexture(GL_TEXTURE_2D, staticLightMap.staticLightMap);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, tileSet.tileSetColor);
 
 		frameCount++;
 
@@ -295,18 +300,22 @@ void processUserInput(GLFWwindow* window)
 	if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
 	{
 		lightList[0].location.y += 0.5f;
+		lightList[1].location.y += 0.5f;
 	}
 	if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
 	{
 		lightList[0].location.y -= 0.5f;
+		lightList[1].location.y -= 0.5f;
 	}
 	if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
 	{
 		lightList[0].location.x += 0.5f;
+		lightList[1].location.x += 0.5f;
 	}
 	if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
 	{
 		lightList[0].location.x -= 0.5f;
+		lightList[1].location.x -= 0.5f;
 	}
 }
 
@@ -628,7 +637,7 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 		tileMapX = (uint16_t)floor(rayPos.x / lightTileRatio.x);
 		tileMapY = (uint16_t)floor(rayPos.y / lightTileRatio.y);
 
-		if (tileMapPtr->mapPtr[(tileMapY * tileMapPtr->width) + tileMapX] == 0)	//check for solid tile
+		if (tileMapPtr->mapPtr[(tileMapY * tileMapPtr->width) + tileMapX])	//check for solid tile
 		{
 			//calculate the xy coordinates inside the tile
 			TileX = abs(((rayPos.x - (lightTileRatio.x / 2)) / lightTileRatio.x) - tileMapX);
