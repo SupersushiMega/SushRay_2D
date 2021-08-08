@@ -33,15 +33,15 @@ void main()
 	float Ypos = 0;
 	vec2 tileXY;
 
-	//offset																		  //scaling of texture coordinates to 1 tile
-	//============================================================================	  //=====================
-	tileXY.x = (1.0 / float(nrTilesX)) * (tileID - floor(float(tileID) / nrTilesX)) + (texCoord.x / nrTilesX);	//calculate the x coordinate of the current tile on the tileset
+	//offset													//scaling of texture coordinates to 1 tile
+	//=====================================================		//=====================
+	tileXY.x = (1.0 / float(nrTilesX)) * (tileID % nrTilesX) + (texCoord.x / nrTilesX);	//calculate the x coordinate of the current tile on the tileset
 	
 	if(floor(float(tileID) / nrTilesX) > 0.0)	//check to ensure that there is no division by 0
 	{
 		//offset															   //scaling of texture coordinates to 1 tile
 		//=================================================================	   //=====================
-		tileXY.y = (1.0 / float(nrTilesY)) * floor(float(tileID) / nrTilesX) + (texCoord.y / nrTilesY);	//calculate the y coordinate of the current tile on the tileset
+		tileXY.y = (1.0 / float(nrTilesY)) * ceil(float(tileID) / nrTilesX) + (texCoord.y / nrTilesY);	//calculate the y coordinate of the current tile on the tileset
 	}
 	else
 	{
@@ -68,4 +68,7 @@ void main()
 	//=====================================================================================
 	//FragColor = staticLightColAverage;
 	FragColor = texture(tileSetColor, tileXY) * (staticLightColAverage);
+	//Xpos = fragPos.x - ((fperPix_X * 0) - fperPix_X);
+	//Ypos = fragPos.y - ((fperPix_Y * 0) - fperPix_Y);
+	//FragColor = texture(tileSetColor, tileXY) * texture(staticLightMap, vec2(Xpos, Ypos));
 }

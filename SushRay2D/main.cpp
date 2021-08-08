@@ -45,7 +45,7 @@ uint16_t winHeight = 1000;
 *=========================================================================================================
 *Requires 2 tileSets: 
 *Color: how a tile looks and how transparent the tile is based on the alpha channel, 
-*Roughness: indicates how reflective a tile is. (Transparency and Roughness use only the outer edges of the Tiles) works without alpha channel(Transparency), Pixeart must be quite large for useable results
+*Reflectivity: indicates how reflective a tile is. (Transparency and Roughness use only the outer edges of the Tiles) works without alpha channel(Transparency), Pixeart must be quite large for useable results
 *
 *Tiles with IDs lower or equal to the given floorTileEndID are considered floor tiles which means that light rays are not affected by them
 *
@@ -56,15 +56,15 @@ uint16_t winHeight = 1000;
 class TileSet
 {
 public:
-	TileSet(const char *PathColor, const char *PathRoughness, uint8_t NrTilesX, uint8_t NrTilesY, uint32_t FloorTileEndID, shader& shader);	
+	TileSet(const char *PathColor, const char *PathReflectivity, uint8_t NrTilesX, uint8_t NrTilesY, uint32_t FloorTileEndID, shader& shader);	
 	~TileSet();
 	int32_t Color_width;
 	int32_t Color_height;
 	int32_t Color_nrChannels;
 
-	int32_t Roughness_width;
-	int32_t Roughness_height;
-	int32_t Roughness_nrChannels;
+	int32_t Reflectivity_width;
+	int32_t Reflectivity_height;
+	int32_t Reflectivity_nrChannels;
 
 	uint8_t nrTilesX;
 	uint8_t nrTilesY;
@@ -74,7 +74,7 @@ public:
 	glm::vec2 tileScale;
 
 	unsigned char* ColorPtr = nullptr;
-	unsigned char* RoughnessPtr = nullptr;
+	unsigned char* ReflectivityPtr = nullptr;
 	unsigned int tileSetColor;	//Texture used by openGL
 };
 
@@ -115,7 +115,7 @@ public:
 	void bindTileMap(TileMap& tileMap);
 	void bindTileSet(TileSet& tileSet);
 	void updateLightMap(vector<Light>& lights);
-	void castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& startCol, glm::vec3& lightFalloff, float range, uint8_t bounceCnt);
+	void castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3 lightCol, float range, uint8_t bounceCnt);
 
 	uint16_t width;
 	uint16_t height;
@@ -131,8 +131,8 @@ public:
 };
 
 	vector<Light> lightList;
-	Light tempLight(glm::vec2(300, 300), 100, glm::vec3(0.8f, 0.8f, 0.8f), 0.1f, 1.0f);
-	Light tempLight2(glm::vec2(300, 300), 100, glm::vec3(0.0f, 0.0f, 0.0f), 10.0f, 0.01f);
+	Light tempLight(glm::vec2(150, 150), 100, glm::vec3(0.8f, 0.8f, 0.8f), 0.1f, 1.0f);
+	Light tempLight2(glm::vec2(150, 150), 100, glm::vec3(0.0f, 0.0f, 0.0f), 10.0f, 0.01f);
 
 int main()
 {
@@ -141,23 +141,47 @@ int main()
 	uint8_t x;
 	uint8_t y;
 
+	uint8_t world[] = {
+		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 2, 3, 2, 1, 1, 2, 3, 2, 0, 0, 0, 0,
+		0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0,
+		0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0,
+		0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0,
+		0, 0, 0, 0, 2, 2, 2, 3, 3, 2, 2, 2, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	};
 
 	lightList.push_back(tempLight);
 	lightList.push_back(tempLight2);
+
+
+	for (x = 4; x < 24; x++)
+	{
+		for (y = 4; y < 24; y++)
+		{
+			tileMap.SetTile(x, y, world[((y -4) * 16) + (x - 4)]);
+		}
+	}
 
 	for (x = 0; x < 25; x++)
 	{
 		for (y = 0; y < 25; y++)
 		{
-			uint8_t value = rand() % 2;
-			if (value == 1)
+			if (tileMap.GetTile(x, y) > 3)
 			{
-				value = 2;
+				tileMap.SetTile(x, y, 0);
 			}
-			tileMap.SetTile(x, y, value);
 		}
 	}
-
 
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);	//set openGL version to 3.3
@@ -189,7 +213,7 @@ int main()
 	
 
 	//load tileset
-	TileSet tileSet("Resources/Textures/TestTiles3x1.png", "Resources/Textures/TestTiles3x1_Roughness.png", 3, 1, 0, baseShader);
+	TileSet tileSet("Resources/Textures/TestTiles3x2.png", "Resources/Textures/TestTiles3x2_Reflection.png", 3, 2, 1, baseShader);
 
 	//vertex buffer object
 	unsigned int VBO;	//Vertex buffer object
@@ -222,7 +246,7 @@ int main()
 
 	//static light map setup
 	//==============================================================================================
-	StaticLightMap staticLightMap(600, 600);
+	StaticLightMap staticLightMap(300, 300);
 	staticLightMap.bindTileMap(tileMap);
 	staticLightMap.bindTileSet(tileSet);
 	staticLightMap.updateLightMap(lightList);
@@ -236,11 +260,6 @@ int main()
 
 	baseShader.setInt("nrTilesX", tileSet.nrTilesX);
 	baseShader.setInt("nrTilesY", tileSet.nrTilesY);
-
-	glm::vec3 colList[] = {
-		glm::vec3(0.4f, 0.2f, 0.1f),
-		glm::vec3(0.8f, 0.8f, 0.8f),
-	};
 	
 	double lastFrame = 0.0f;
 	float xTrans = 0.0f;
@@ -341,7 +360,7 @@ void processUserInput(GLFWwindow* window)
 TileSet::TileSet(const char* PathColor, const char* PathRoughness, uint8_t NrTilesX, uint8_t NrTilesY, uint32_t FloorTileEndID, shader& shader)
 {
 	ColorPtr = stbi_load(PathColor, &Color_width, &Color_height, &Color_nrChannels, 0);
-	RoughnessPtr = stbi_load(PathRoughness, &Roughness_width, &Roughness_height, &Roughness_nrChannels, 0);
+	ReflectivityPtr = stbi_load(PathRoughness, &Reflectivity_width, &Reflectivity_height, &Reflectivity_nrChannels, 0);
 
 	for (uint32_t i = 0; i < (Color_width * Color_height) * Color_nrChannels; i++)
 	{
@@ -357,7 +376,7 @@ TileSet::TileSet(const char* PathColor, const char* PathRoughness, uint8_t NrTil
 
 	floorTileEndID = FloorTileEndID;
 
-	if (!RoughnessPtr)
+	if (!ReflectivityPtr)
 	{
 		cout << "ERROR: Roughness Tileset failed to load" << endl;
 	}
@@ -415,9 +434,9 @@ TileSet::TileSet(const char* PathColor, const char* PathRoughness, uint8_t NrTil
 TileSet::~TileSet()
 {
 	delete[] ColorPtr;
-	delete[] RoughnessPtr;
+	delete[] ReflectivityPtr;
 	ColorPtr = nullptr;
-	RoughnessPtr = nullptr;
+	ReflectivityPtr = nullptr;
 }
 
 TileMap::TileMap(uint16_t Width, uint16_t Height)
@@ -623,7 +642,7 @@ void StaticLightMap::updateLightMap(vector<Light>& lights)
 		{
 			DeltaXY.x = sin(angle);
 			DeltaXY.y = cos(angle);
-			castRay(lights[lightID].location, DeltaXY, lightCol, lightFalloff, lights[lightID].range, 0);
+			castRay(lights[lightID].location, DeltaXY, lightCol, lights[lightID].range, 0);
 			angle += angleDelta;
 		}
 	}
@@ -631,11 +650,9 @@ void StaticLightMap::updateLightMap(vector<Light>& lights)
 	glBindTexture(GL_TEXTURE_2D, staticLightMap);
 }
 
-void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& startCol, glm::vec3& lightFalloff, float range, uint8_t bounceCnt)
+void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3 lightCol, float range, uint8_t bounceCnt)
 {
-
 	bounceCnt++;
-
 
 	uint32_t tileID;
 
@@ -668,12 +685,13 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 	bool Yenter = false;
 	bool Xenter = false;
 
-	glm::vec3 lightCol = startCol;
 	glm::vec4 rgba;
-	glm::vec3 roughness;
+	glm::vec3 reflectivity;
+
+	glm::vec3 lightFalloff = lightCol / range;
 
 	uint8_t ColorPixSize = tileSetPtr->Color_nrChannels * sizeof(uint8_t);	//size of a single pixel in the color tile set
-	uint8_t RoughnessPixSize = tileSetPtr->Roughness_nrChannels * sizeof(uint8_t);	//size of a single pixel in the roughness tileset
+	uint8_t ReflectivityPixSize = tileSetPtr->Reflectivity_nrChannels * sizeof(uint8_t);	//size of a single pixel in the reflectivity tileset
 
 	while (range > 0)
 	{
@@ -689,8 +707,6 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 		}
 		//=================
 
-
-
 		//calculate the xy coordinates of the ray on the tile map
 		tileMapX = (uint16_t)floor(rayPos.x / lightTileRatio.x);
 		tileMapY = (uint16_t)floor(rayPos.y / lightTileRatio.y);
@@ -701,21 +717,24 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 
 		tileID = tileMapPtr->mapPtr[(tileMapY * tileMapPtr->width) + tileMapX];
 
-		tileSetX = ((tileID - floor(float(tileID) / tileSetPtr->nrTilesX)) * tileSetPtr->tileScale.x) + floor(TileX * tileSetPtr->tileScale.x);
+		tileSetX = ((tileID % tileSetPtr->nrTilesX) * tileSetPtr->tileScale.x) + floor(TileX * tileSetPtr->tileScale.x);
 
-		if ((tileID / tileSetPtr->nrTilesX) > 0.0)
+		if (floor(float(tileID) / tileSetPtr->nrTilesX) > 0.0)
 		{
-			tileSetY = ((tileID / tileSetPtr->nrTilesX) * tileSetPtr->tileScale.y) + floor(TileY * tileSetPtr->tileScale.y);
+			tileSetY = (floor(float(tileID) / tileSetPtr->nrTilesX) * tileSetPtr->tileScale.y) + floor(TileY * tileSetPtr->tileScale.y);
 		}
 		else
 		{
 			tileSetY = floor(TileY * tileSetPtr->tileScale.y);
 		}
 		
+		reflectivity.r = float(tileSetPtr->ReflectivityPtr[((tileSetY * tileSetPtr->Reflectivity_width) + tileSetX) * ReflectivityPixSize + (0 * sizeof(uint8_t))]) / 255;
+		reflectivity.g = float(tileSetPtr->ReflectivityPtr[((tileSetY * tileSetPtr->Reflectivity_width) + tileSetX) * ReflectivityPixSize + (1 * sizeof(uint8_t))]) / 255;
+		reflectivity.b = float(tileSetPtr->ReflectivityPtr[((tileSetY * tileSetPtr->Reflectivity_width) + tileSetX) * ReflectivityPixSize + (2 * sizeof(uint8_t))]) / 255;
+		
 		rgba.r = float(tileSetPtr->ColorPtr[((tileSetY * tileSetPtr->Color_width) + tileSetX) * ColorPixSize + (0 * sizeof(uint8_t))]) / 255;
 		rgba.g = float(tileSetPtr->ColorPtr[((tileSetY * tileSetPtr->Color_width) + tileSetX) * ColorPixSize + (1 * sizeof(uint8_t))]) / 255;
 		rgba.b = float(tileSetPtr->ColorPtr[((tileSetY * tileSetPtr->Color_width) + tileSetX) * ColorPixSize + (2 * sizeof(uint8_t))]) / 255;
-
 		if (tileSetPtr->Color_nrChannels >= 4)	//check for alpha channel
 		{
 			rgba.a = float(tileSetPtr->ColorPtr[((tileSetY * tileSetPtr->Color_width) + tileSetX) * ColorPixSize + (3 * sizeof(uint8_t))]) / 255;
@@ -727,7 +746,6 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 
 		if (tileID > tileSetPtr->floorTileEndID)	//check for solid tile
 		{
-
 			//calculate the xy distance from middle of tile
 			distTileX = abs(((rayPos.x - (lightTileRatio.x / 2)) / lightTileRatio.x) - tileMapX);
 			distTileY = abs(((rayPos.y - (lightTileRatio.y / 2)) / lightTileRatio.y) - tileMapY);
@@ -748,11 +766,19 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 			{
 				if (Xenter)	//check if the collision on the side left or right of the tile
 				{
-					castRay(rayPos - deltaXY, glm::vec2(deltaXY.x, -deltaXY.y), lightCol, lightFalloff, range, bounceCnt);;
+					castRay(rayPos - deltaXY, glm::vec2(deltaXY.x, deltaXY.y), lightCol, range, bounceCnt);	//send ray straight forward
+					deltaXY.y = -deltaXY.y;	//change direction
+					lightCol = lightCol * reflectivity * glm::vec3(rgba.r, rgba.g, rgba.b) * rgba.a;
+					lightFalloff = lightCol / range;
+					bounceCnt++;
 				}
 				else if (Yenter)	//check if the collision on the side top or bottom of the tile
 				{
-					castRay(rayPos - deltaXY, glm::vec2(-deltaXY.x, deltaXY.y), lightCol, lightFalloff, range, bounceCnt);
+					castRay(rayPos - deltaXY, glm::vec2(deltaXY.x, deltaXY.y), lightCol, range, bounceCnt);	//send ray straight forward
+					deltaXY.x = -deltaXY.x;	//change direction
+					lightCol = lightCol * reflectivity * glm::vec3(rgba.r, rgba.g, rgba.b) * rgba.a;
+					lightFalloff = lightCol / range;
+					bounceCnt++;
 				}
 				else
 				{
