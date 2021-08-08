@@ -66,6 +66,6 @@ void main()
 	//staticLightColAverage += 0.3;
 	staticLightColAverage /= 9;
 	//=====================================================================================
-	//FragColor = texture(tileSetColor, vec2((texCoord.x / 3) + (1.0 / 3) * 2, texCoord.y)) * staticLightColAverage;
-	FragColor = texture(tileSetColor, tileXY) * staticLightColAverage;
+	//FragColor = staticLightColAverage;
+	FragColor = texture(tileSetColor, tileXY) * (staticLightColAverage);
 }

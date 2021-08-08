@@ -41,17 +41,22 @@ uint16_t winWidth = 1000;
 uint16_t winHeight = 1000;
 
 
-//TileSets
-//=========================================================================================================
-//Requires 2 tileSets: Color: how a tile looks and how transparent the tile is based on the alpha channel, Roughness: indicates how reflective a tile is. (Transparency and Roughness use only the outer edges of the Tiles) works without alpha channel(Transparency), Pixeart must be quite large for useable results
-/*the tiles are given IDs starting from the top left corner in the following order :  0,  1,  2,  3,
+/*TileSets
+*=========================================================================================================
+*Requires 2 tileSets: 
+*Color: how a tile looks and how transparent the tile is based on the alpha channel, 
+*Roughness: indicates how reflective a tile is. (Transparency and Roughness use only the outer edges of the Tiles) works without alpha channel(Transparency), Pixeart must be quite large for useable results
+*
+*Tiles with IDs lower or equal to the given floorTileEndID are considered floor tiles which means that light rays are not affected by them
+*
+*the tiles are given IDs starting from the top left corner in the following order :  0,  1,  2,  3,
 *																					  4,  5,  6,  7,
 *																					  8,  9, 10, 11,
 *																					 12, 13, 14, 15 */
 class TileSet
 {
 public:
-	TileSet(const char *PathColor, const char *PathRoughness, uint8_t NrTilesX, uint8_t NrTilesY, shader& shader);
+	TileSet(const char *PathColor, const char *PathRoughness, uint8_t NrTilesX, uint8_t NrTilesY, uint32_t FloorTileEndID, shader& shader);	
 	~TileSet();
 	int32_t Color_width;
 	int32_t Color_height;
@@ -63,6 +68,11 @@ public:
 
 	uint8_t nrTilesX;
 	uint8_t nrTilesY;
+
+	uint32_t floorTileEndID;
+
+	glm::vec2 tileScale;
+
 	unsigned char* ColorPtr = nullptr;
 	unsigned char* RoughnessPtr = nullptr;
 	unsigned int tileSetColor;	//Texture used by openGL
@@ -76,6 +86,7 @@ public:
 	uint8_t GetTile(uint16_t x, uint16_t y);
 	void calcTileValues(uint16_t windowWidth, uint16_t windowHeight);	//calculates values used for scaling and positioning of tiles
 	void SetTile(uint16_t x, uint16_t y, uint8_t tileID);
+
 	uint16_t width;
 	uint16_t height;
 	glm::vec2 tileScale;
@@ -102,6 +113,7 @@ public:
 	~StaticLightMap();
 	
 	void bindTileMap(TileMap& tileMap);
+	void bindTileSet(TileSet& tileSet);
 	void updateLightMap(vector<Light>& lights);
 	void castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& startCol, glm::vec3& lightFalloff, float range, uint8_t bounceCnt);
 
@@ -111,6 +123,7 @@ public:
 	glm::vec2 lightTileRatio;
 	glm::vec3* mapPtr = nullptr;
 	TileMap* tileMapPtr = nullptr;
+	TileSet* tileSetPtr = nullptr;
 
 	uint8_t maxRayBounce = 4;
 
@@ -118,8 +131,8 @@ public:
 };
 
 	vector<Light> lightList;
-	Light tempLight(glm::vec2(300, 300), 100, glm::vec3(0.5f, 0.5f, 0.5f), 0.1f, 1.0f);
-	Light tempLight2(glm::vec2(300, 300), 100, glm::vec3(1.0f, 0.0f, 0.0f), 10.0f, 0.01f);
+	Light tempLight(glm::vec2(300, 300), 100, glm::vec3(0.8f, 0.8f, 0.8f), 0.1f, 1.0f);
+	Light tempLight2(glm::vec2(300, 300), 100, glm::vec3(0.0f, 0.0f, 0.0f), 10.0f, 0.01f);
 
 int main()
 {
@@ -136,7 +149,12 @@ int main()
 	{
 		for (y = 0; y < 25; y++)
 		{
-			tileMap.SetTile(x, y, rand() % 2);
+			uint8_t value = rand() % 2;
+			if (value == 1)
+			{
+				value = 2;
+			}
+			tileMap.SetTile(x, y, value);
 		}
 	}
 
@@ -171,7 +189,7 @@ int main()
 	
 
 	//load tileset
-	TileSet tileSet("Resources/Textures/TestTiles3x1.png", "Resources/Textures/TestTiles3x1.png_roughness", 3, 1, baseShader);
+	TileSet tileSet("Resources/Textures/TestTiles3x1.png", "Resources/Textures/TestTiles3x1_Roughness.png", 3, 1, 0, baseShader);
 
 	//vertex buffer object
 	unsigned int VBO;	//Vertex buffer object
@@ -206,6 +224,7 @@ int main()
 	//==============================================================================================
 	StaticLightMap staticLightMap(600, 600);
 	staticLightMap.bindTileMap(tileMap);
+	staticLightMap.bindTileSet(tileSet);
 	staticLightMap.updateLightMap(lightList);
 
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);	//set clear color	
@@ -319,15 +338,24 @@ void processUserInput(GLFWwindow* window)
 	}
 }
 
-TileSet::TileSet(const char *PathColor, const char *PathRoughness, uint8_t NrTilesX, uint8_t NrTilesY, shader &shader)
+TileSet::TileSet(const char* PathColor, const char* PathRoughness, uint8_t NrTilesX, uint8_t NrTilesY, uint32_t FloorTileEndID, shader& shader)
 {
 	ColorPtr = stbi_load(PathColor, &Color_width, &Color_height, &Color_nrChannels, 0);
 	RoughnessPtr = stbi_load(PathRoughness, &Roughness_width, &Roughness_height, &Roughness_nrChannels, 0);
+
+	for (uint32_t i = 0; i < (Color_width * Color_height) * Color_nrChannels; i++)
+	{
+		uint32_t a = ColorPtr[i];
+		cout << i << ": " << a << endl;
+	}
+	
 	nrTilesX = NrTilesX;
 	nrTilesY = NrTilesY;
 
 	shader.setFloat("fperTileX", 1.0f / NrTilesX);
 	shader.setFloat("fperTileY", 1.0f / NrTilesY);
+
+	floorTileEndID = FloorTileEndID;
 
 	if (!RoughnessPtr)
 	{
@@ -336,9 +364,11 @@ TileSet::TileSet(const char *PathColor, const char *PathRoughness, uint8_t NrTil
 
 	if (ColorPtr)
 	{
-		shader.use();
+		tileScale.x = Color_width / nrTilesX;
+		tileScale.y = Color_height / nrTilesY;
 		//Color Tileset setup
 		//==============================================================================================
+		shader.use();
 		float borderCol[] = { 1.0f, 0.0f, 0.0f, 0.0f };	//color outside of map (displayed only when something is displayed outside of map)
 		glGenTextures(1, &tileSetColor);
 		glActiveTexture(GL_TEXTURE2);
@@ -551,6 +581,7 @@ StaticLightMap::~StaticLightMap()
 	delete[] mapPtr;
 	mapPtr = nullptr;
 	tileMapPtr = nullptr;
+	tileSetPtr = nullptr;
 }
 
 void StaticLightMap::bindTileMap(TileMap& tileMap)
@@ -558,6 +589,11 @@ void StaticLightMap::bindTileMap(TileMap& tileMap)
 	tileMapPtr = &tileMap;
 	lightTileRatio.x = width / tileMapPtr->width;	//the ratio of the x axis in the light map to the x axis of the tile map
 	lightTileRatio.y = height / tileMapPtr->height;	//the ratio of the y axis in the light map to the y axis of the tile map
+}
+
+void StaticLightMap::bindTileSet(TileSet& tileSet)
+{
+	tileSetPtr = &tileSet;
 }
 
 void StaticLightMap::updateLightMap(vector<Light>& lights)
@@ -600,21 +636,44 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 
 	bounceCnt++;
 
+
+	uint32_t tileID;
+
+	//x and y position on the lightmap
 	uint16_t rayPosFloor_X;
 	uint16_t rayPosFloor_Y;
-
+	
+	//x and y position on the tilemap
 	uint16_t tileMapX;
 	uint16_t tileMapY;
 
+	//distance from the center of a tile on the x and y axis
+	float distTileX;
+	float distTileY;
+
+	//x and y position on the tileset
+	uint16_t tileSetX;
+	uint16_t tileSetY;
+
+	//x and y position on tile
 	float TileX;
 	float TileY;
 
-	bool insideTile = false;
+	//the number of the pixel 
+	uint32_t pixelNr;
+
+	bool insideTile = false; 
+	bool tileHasAlpha = false;
 
 	bool Yenter = false;
 	bool Xenter = false;
 
 	glm::vec3 lightCol = startCol;
+	glm::vec4 rgba;
+	glm::vec3 roughness;
+
+	uint8_t ColorPixSize = tileSetPtr->Color_nrChannels * sizeof(uint8_t);	//size of a single pixel in the color tile set
+	uint8_t RoughnessPixSize = tileSetPtr->Roughness_nrChannels * sizeof(uint8_t);	//size of a single pixel in the roughness tileset
 
 	while (range > 0)
 	{
@@ -630,24 +689,54 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 		}
 		//=================
 
-		rayPosFloor_X = (uint16_t)floor(rayPos.x);
-		rayPosFloor_Y = (uint16_t)floor(rayPos.y);
+
 
 		//calculate the xy coordinates of the ray on the tile map
 		tileMapX = (uint16_t)floor(rayPos.x / lightTileRatio.x);
 		tileMapY = (uint16_t)floor(rayPos.y / lightTileRatio.y);
 
-		if (tileMapPtr->mapPtr[(tileMapY * tileMapPtr->width) + tileMapX])	//check for solid tile
-		{
-			//calculate the xy coordinates inside the tile
-			TileX = abs(((rayPos.x - (lightTileRatio.x / 2)) / lightTileRatio.x) - tileMapX);
-			TileY = abs(((rayPos.y - (lightTileRatio.y / 2)) / lightTileRatio.y) - tileMapY);
+		//calculate the xy position from inside of tile in tileSet
+		TileX = (rayPos.x / lightTileRatio.x) - tileMapX;
+		TileY = (rayPos.y / lightTileRatio.y) - tileMapY;
 
-			if (TileX < TileY)	//check if the collision on the side left or right of the tile
+		tileID = tileMapPtr->mapPtr[(tileMapY * tileMapPtr->width) + tileMapX];
+
+		tileSetX = ((tileID - floor(float(tileID) / tileSetPtr->nrTilesX)) * tileSetPtr->tileScale.x) + floor(TileX * tileSetPtr->tileScale.x);
+
+		if ((tileID / tileSetPtr->nrTilesX) > 0.0)
+		{
+			tileSetY = ((tileID / tileSetPtr->nrTilesX) * tileSetPtr->tileScale.y) + floor(TileY * tileSetPtr->tileScale.y);
+		}
+		else
+		{
+			tileSetY = floor(TileY * tileSetPtr->tileScale.y);
+		}
+		
+		rgba.r = float(tileSetPtr->ColorPtr[((tileSetY * tileSetPtr->Color_width) + tileSetX) * ColorPixSize + (0 * sizeof(uint8_t))]) / 255;
+		rgba.g = float(tileSetPtr->ColorPtr[((tileSetY * tileSetPtr->Color_width) + tileSetX) * ColorPixSize + (1 * sizeof(uint8_t))]) / 255;
+		rgba.b = float(tileSetPtr->ColorPtr[((tileSetY * tileSetPtr->Color_width) + tileSetX) * ColorPixSize + (2 * sizeof(uint8_t))]) / 255;
+
+		if (tileSetPtr->Color_nrChannels >= 4)	//check for alpha channel
+		{
+			rgba.a = float(tileSetPtr->ColorPtr[((tileSetY * tileSetPtr->Color_width) + tileSetX) * ColorPixSize + (3 * sizeof(uint8_t))]) / 255;
+			if (rgba.a < 1.0f)
+			{
+				tileHasAlpha = true;
+			}
+		}
+
+		if (tileID > tileSetPtr->floorTileEndID)	//check for solid tile
+		{
+
+			//calculate the xy distance from middle of tile
+			distTileX = abs(((rayPos.x - (lightTileRatio.x / 2)) / lightTileRatio.x) - tileMapX);
+			distTileY = abs(((rayPos.y - (lightTileRatio.y / 2)) / lightTileRatio.y) - tileMapY);
+
+			if (distTileX < distTileY)	//check if the collision on the side left or right of the tile
 			{
 				Xenter = true;
 			}
-			else if (TileX > TileY)	//check if the collision on the side top or bottom of the tile
+			else if (distTileX > distTileY)	//check if the collision on the side top or bottom of the tile
 			{
 				Yenter = true;
 			}
@@ -655,7 +744,6 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 			{
 				return;
 			}
-
 			if ((bounceCnt < maxRayBounce) && !insideTile)
 			{
 				if (Xenter)	//check if the collision on the side left or right of the tile
@@ -671,7 +759,7 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 					return;
 				}
 			}
-			else
+			else if(!(rgba.a < 1.0f))
 			{
 				//check if the light has gone far enough in the tile to be stopped (number indicates distance from center and ranges from 0.01(middle) to 0.5(outer edge))(WARNING: LOW VALUES LEAD TO UNRELIABILITY)
 				float dist = 0.2f;
@@ -681,14 +769,14 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 				}
 				if (Yenter)
 				{
-					if (TileX < dist)
+					if (distTileX < dist)
 					{
 						return;
 					}
 				}
 				if (Xenter)
 				{
-					if (TileY < dist)
+					if (distTileY < dist)
 					{
 						return;
 					}
@@ -696,16 +784,25 @@ void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3& sta
 			}
 			insideTile = true;
 		}
-		else if(insideTile)
+		else if(insideTile && !tileHasAlpha)
 		{
 			return;
 		}
+		else
+		{
+			insideTile = false;
+			tileHasAlpha = false;
+		}
 
+		rayPosFloor_X = (uint16_t)floor(rayPos.x);
+		rayPosFloor_Y = (uint16_t)floor(rayPos.y);
 
 		mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)] += lightCol;	//add light to pixel
+		
 		rayPos += deltaXY;
 		lightCol -= lightFalloff;	//calculate new light color
 		range--;
+
 		//Clamping
 		//================================================================
 		if (mapPtr[(rayPosFloor_Y * width) + (rayPosFloor_X)].x > 1.0f)
