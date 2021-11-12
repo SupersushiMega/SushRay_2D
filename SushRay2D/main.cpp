@@ -278,7 +278,14 @@ int main()
 	baseShader.setInt("dynamicLightMap", 1);
 	baseShader.setInt("tileSetColor", 2);
 
-	RayCompute.setInt("staticLightMap", 0);
+	RayCompute.use();
+	RayCompute.setInt("lightMapIn", 0);
+	RayCompute.setInt("lightMapOut", 0);
+
+	RayCompute.setInt("width", 1024);
+	RayCompute.setInt("height", 1024);
+	RayCompute.setInt("radius", 100);
+	RayCompute.setVec2("startPos", glm::vec2(500, 500));
 
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, tileSet.tileSetColor);
@@ -303,7 +310,7 @@ int main()
 
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		RayCompute.use();
-		glDispatchCompute(staticLightMap.width / 16, staticLightMap.height / 16, 1);
+		glDispatchCompute(600, 1, 1);
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		baseShader.use();
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
