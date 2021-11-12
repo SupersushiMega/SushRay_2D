@@ -1,13 +1,14 @@
 #version 430 core
 
-uniform float fperPix_X;
-uniform float fperPix_Y;
+#define PI 3.1415926535897932384626433832795
 
-layout(RGBA32F) writeonly uniform image2D staticLightMap;	//texture0
+float Angle = (float(2.0 * PI) / gl_NumWorkGroups.x) * gl_WorkGroupID.x;
+
+layout(RGBA32F) uniform image2D staticLightMap;	//texture0
 layout(local_size_x = 16, local_size_y = 16) in;
 
 void main()
 {
-	ivec2 coord = ivec2(gl_LocalInvocationID.xy) + ivec2(gl_GlobalInvocationID.xy);
-	imageStore(staticLightMap, coord, vec4(255, 1.0, 1.0, 1.0));
+	ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+	imageStore(staticLightMap, coord, vec4(1, 1, 1, 1));
 }

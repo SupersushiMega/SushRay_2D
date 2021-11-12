@@ -33,13 +33,13 @@ void processUserInput(GLFWwindow* window);
 
 using namespace std;	//use std namespace
 
-const uint16_t START_WIDTH = 1000;
-const uint16_t START_HEIGHT = 1000;
+const uint16_t START_WIDTH = 1024;
+const uint16_t START_HEIGHT = 1024;
 
 const double PI = 2 * acos(0.0f);
 
-uint16_t winWidth = 1000;
-uint16_t winHeight = 1000;
+uint16_t winWidth = 1024;
+uint16_t winHeight = 1024;
 
 
 /*TileSets
@@ -249,7 +249,7 @@ int main()
 
 	//static light map setup
 	//==============================================================================================
-	StaticLightMap staticLightMap(300, 300);
+	StaticLightMap staticLightMap(1024, 1024);
 	staticLightMap.bindTileMap(tileMap);
 	staticLightMap.bindTileSet(tileSet);
 	staticLightMap.updateLightMap(lightList);
@@ -301,10 +301,12 @@ int main()
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
 		glBindImageTexture(0, staticLightMap.staticLightMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		RayCompute.use();
 		glDispatchCompute(staticLightMap.width / 16, staticLightMap.height / 16, 1);
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		baseShader.use();
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 		frameCount++;
 
