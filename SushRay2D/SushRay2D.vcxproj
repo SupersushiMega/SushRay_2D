@@ -156,6 +156,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\Shaders\ComputeShader\RayTracer.comp" />
     <None Include="Resources\Shaders\FragmentShader\baseFragShader.frag" />
     <None Include="Resources\Shaders\VertexShader\baseVertShader.vert" />
   </ItemGroup>

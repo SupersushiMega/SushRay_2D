@@ -1,5 +1,6 @@
 #include "ShaderLoader/ShaderLoader.h"
 
+//graphics shader
 shader::shader(const char* vertexPath, const char* fragmentPath)
 {
 	//define strings, stringstreams and ifstreams
@@ -87,10 +88,80 @@ shader::shader(const char* vertexPath, const char* fragmentPath)
 		glGetProgramInfoLog(ID, 512, NULL, infoLog);	//get error
 		std::cout << "ERROR: linking of shaders failed: \n" << infoLog << std::endl;
 	}
-	
+
 	//delete shaders
 	glDeleteShader(vertShader);
 	glDeleteShader(fragShader);
+	//=========================================================================
+}
+
+//compute shader
+shader::shader(const char* computePath)
+{
+	//define strings, stringstreams and ifstreams
+	std::string compCode;
+	std::ifstream compShaderFile;
+	std::stringstream compShaderStream;
+
+	//check if ifstreams are capable of throwing exceptions
+	compShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+	//load data
+	//=========================================================================
+	try
+	{
+		//open files
+		compShaderFile.open(computePath);
+
+		//read content in buffer into streams
+		compShaderStream << compShaderFile.rdbuf();
+
+		//close files
+		compShaderFile.close();
+
+		//convert streams into strings
+		compCode = compShaderStream.str();
+	}
+	catch (std::ifstream::failure e)
+	{
+		std::cout << "ERROR: failure loading shader file" << std::endl;
+	}
+	const char* compShaderCode = compCode.c_str();
+	//=========================================================================
+
+	//compilation
+	//=========================================================================
+	unsigned int compShader;
+	int success;
+	char infoLog[512];
+
+	//vertex shader
+	compShader = glCreateShader(GL_COMPUTE_SHADER);
+	glShaderSource(compShader, 1, &compShaderCode, NULL);	//attach code
+	glCompileShader(compShader);	//compile shader
+
+	glGetShaderiv(compShader, GL_COMPILE_STATUS, &success);	//get compilation status
+	if (!success)	//check if compilation failed
+	{
+		glGetShaderInfoLog(compShader, 512, NULL, infoLog);	//get error
+		std::cout << "ERROR: compilation of shader failed: \n" << infoLog << std::endl;
+	}
+
+	//Linking
+	//=========================================================================
+	ID = glCreateProgram();
+	glAttachShader(ID, compShader);	//attach vertex shader
+	glLinkProgram(ID);	//link shaders
+
+	glGetProgramiv(ID, GL_LINK_STATUS, &success);	//get link status
+	if (!success)	//check if linking failed
+	{
+		glGetProgramInfoLog(ID, 512, NULL, infoLog);	//get error
+		std::cout << "ERROR: linking of shaders failed: \n" << infoLog << std::endl;
+	}
+	
+	//delete shaders
+	glDeleteShader(compShader);
 	//=========================================================================
 }
 

@@ -19,6 +19,9 @@
     <Filter Include="Resource Files\FragmentShader">
       <UniqueIdentifier>{570c4791-84c9-4345-bbab-354b2e077956}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\ComputeShader">
+      <UniqueIdentifier>{81cc98b6-86bc-4366-8e23-43930954f921}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -37,6 +40,9 @@
     </None>
     <None Include="Resources\Shaders\VertexShader\baseVertShader.vert">
       <Filter>Resource Files\VertexShader</Filter>
+    </None>
+    <None Include="Resources\Shaders\ComputeShader\RayTracer.comp">
+      <Filter>Resource Files\ComputeShader</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

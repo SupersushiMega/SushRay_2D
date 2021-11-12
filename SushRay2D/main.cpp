@@ -28,6 +28,7 @@ const unsigned int TILE_INDICES[] = {
 
 //prototypes
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);	//callback for window resize
+void ErrorCallback(int, const char* err_str);	//callback for errors
 void processUserInput(GLFWwindow* window);
 
 using namespace std;	//use std namespace
@@ -184,7 +185,7 @@ int main()
 	}
 
 	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);	//set openGL version to 3.3
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);	//set openGL version to 4.3
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);	//
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);	//set openGL profile to core
 
@@ -197,6 +198,7 @@ int main()
 	}
 	glfwMakeContextCurrent(window);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwSetErrorCallback(ErrorCallback);
 
 	status = gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 	if (!status)	//check if GLAD failed to initialize
@@ -209,6 +211,7 @@ int main()
 
 	//load shaders
 	shader baseShader("Resources/Shaders/VertexShader/baseVertShader.vert", "Resources/Shaders/FragmentShader/baseFragShader.frag");
+	shader RayCompute("Resources/Shaders/ComputeShader/RayTracer.comp");
 	
 	
 
@@ -275,6 +278,8 @@ int main()
 	baseShader.setInt("dynamicLightMap", 1);
 	baseShader.setInt("tileSetColor", 2);
 
+	RayCompute.setInt("staticLightMap", 0);
+
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, tileSet.tileSetColor);
 	while (!glfwWindowShouldClose(window))
@@ -288,9 +293,18 @@ int main()
 		staticLightMap.updateLightMap(lightList);
 
 		//send data 
+		cout << RayCompute.ID << endl;
+		cout << baseShader.ID << endl;
+
 		glActiveTexture(GL_TEXTURE0);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
 		glBindTexture(GL_TEXTURE_2D, staticLightMap.staticLightMap);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
+		glBindImageTexture(0, staticLightMap.staticLightMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+		RayCompute.use();
+		glDispatchCompute(staticLightMap.width / 16, staticLightMap.height / 16, 1);
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		baseShader.use();
 
 		frameCount++;
 
@@ -326,6 +340,11 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	glViewport(0, 0, width, height);
 	winHeight = height;
 	winWidth = width;
+}
+
+void ErrorCallback(int, const char* err_str)
+{
+	cout << "GLFW error: " << err_str << endl;
 }
 
 void processUserInput(GLFWwindow* window)

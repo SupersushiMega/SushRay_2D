@@ -20,6 +20,7 @@ class shader
 public:
 	unsigned int ID;	//stores program ID
 	shader(const char* vertexPath, const char* fragmentPath);	//constructor for reading and building of the shader
+	shader(const char* computePath);	//constructor for reading and building of the shader
 	void use();	//used to activate the shader
 
 	//uniform utilities
