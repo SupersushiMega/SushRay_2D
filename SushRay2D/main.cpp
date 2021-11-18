@@ -29,6 +29,9 @@ const unsigned int TILE_INDICES[] = {
 //prototypes
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);	//callback for window resize
 void ErrorCallback(int, const char* err_str);	//callback for errors
+
+void GLAPIENTRY MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);	//Callback for debug messages
+
 void processUserInput(GLFWwindow* window);
 
 using namespace std;	//use std namespace
@@ -184,6 +187,8 @@ int main()
 		}
 	}
 
+	double shaderDelay;
+
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);	//set openGL version to 4.3
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);	//
@@ -209,11 +214,15 @@ int main()
 
 	glViewport(0, 0, START_WIDTH, START_HEIGHT);	//set size of render window
 
+	//enables
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(MessageCallback, 0);
+
 	//load shaders
 	shader baseShader("Resources/Shaders/VertexShader/baseVertShader.vert", "Resources/Shaders/FragmentShader/baseFragShader.frag");
 	shader RayCompute("Resources/Shaders/ComputeShader/RayTracer.comp");
-	
-	
+
+	baseShader.use();
 
 	//load tileset
 	TileSet tileSet("Resources/Textures/TestTiles3x2.png", "Resources/Textures/TestTiles3x2_Reflection.png", 3, 2, 1, baseShader);
@@ -225,16 +234,13 @@ int main()
 	glBufferData(GL_ARRAY_BUFFER, sizeof(TILE_VERT), TILE_VERT, GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);	//define how to read vertex data
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));	//define how to read texture coordinates
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	baseShader.use();
+	//glEnableVertexAttribArray(0);
+	//glEnableVertexAttribArray(1);
 
 	//Vertex array object
-	unsigned int VAO;	//Vertex array object
+	GLuint VAO;	//Vertex array object
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(TILE_VERT), TILE_VERT, GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);	//define how to read vertex data
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));	//define how to read texture coordinates
@@ -249,7 +255,7 @@ int main()
 
 	//static light map setup
 	//==============================================================================================
-	StaticLightMap staticLightMap(1024, 1024);
+	StaticLightMap staticLightMap(400, 400);
 	staticLightMap.bindTileMap(tileMap);
 	staticLightMap.bindTileSet(tileSet);
 	staticLightMap.updateLightMap(lightList);
@@ -281,13 +287,14 @@ int main()
 	RayCompute.use();
 	RayCompute.setInt("lightMapOut", 0);
 
-	RayCompute.setInt("width", 1024);
-	RayCompute.setInt("height", 1024);
+	RayCompute.setInt("width", 400);
+	RayCompute.setInt("height", 400);
 	RayCompute.setInt("radius", 100);
-	RayCompute.setVec2("startPos", glm::vec2(500, 500));
+	RayCompute.setVec2("startPos", glm::vec2(200, 200));
 
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, tileSet.tileSetColor);
+
 	while (!glfwWindowShouldClose(window))
 	{
 		baseShader.setVec2("tileScale", tileMap.tileScale);
@@ -296,7 +303,9 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
-		//staticLightMap.updateLightMap(lightList);
+		staticLightMap.updateLightMap(lightList);
+
+		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 		//send data 
 		glActiveTexture(GL_TEXTURE0);
@@ -304,9 +313,22 @@ int main()
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
 		glBindImageTexture(0, staticLightMap.staticLightMap, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
-		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		shaderDelay = glfwGetTime();
 		RayCompute.use();
-		glDispatchCompute(1000, 1, 1);
+		glDispatchCompute(200, 1, 1);
+		GLsync syncState = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+		GLenum syncRes = glClientWaitSync(syncState, 0, 999999);
+		
+		cout << "raw >> " << syncRes << endl;
+		cout << "GL_ALREADY_SIGNALED >> " << (syncRes == GL_ALREADY_SIGNALED) << endl;
+		cout << "GL_TIMEOUT_EXPIRED >> " << (syncRes == GL_TIMEOUT_EXPIRED) << endl;
+		cout << "GL_CONDITION_SATISFIED >> " << (syncRes == GL_CONDITION_SATISFIED) << endl;
+		cout << "GL_WAIT_FAILED >> " << (syncRes == GL_WAIT_FAILED) << endl;
+
+		cout << glfwGetTime() - shaderDelay << endl;
+		while ((glfwGetTime() - shaderDelay) < 1);
+		glDeleteSync(syncState);
 		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		baseShader.use();
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -315,7 +337,7 @@ int main()
 
 		if ((glfwGetTime() - lastFrame) >= 1.0f)
 		{
-			cout << "fps: " << frameCount << endl;
+			//cout << "fps: " << frameCount << endl;
 			frameCount = 0;
 			lastFrame = glfwGetTime();
 		}
@@ -351,6 +373,12 @@ void ErrorCallback(int, const char* err_str)
 {
 	cout << "GLFW error: " << err_str << endl;
 }
+
+void GLAPIENTRY MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+{
+	fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n", (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
+};
+
 
 void processUserInput(GLFWwindow* window)
 {
