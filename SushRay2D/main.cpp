@@ -145,6 +145,8 @@ int main()
 	uint8_t x;
 	uint8_t y;
 
+	GLsync syncState;
+
 	uint8_t world[] = {
 		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
@@ -290,6 +292,7 @@ int main()
 	RayCompute.setInt("width", 400);
 	RayCompute.setInt("height", 400);
 	RayCompute.setInt("radius", 100);
+	RayCompute.setInt("rayCount", 1000);
 	RayCompute.setVec2("startPos", glm::vec2(200, 200));
 
 	glActiveTexture(GL_TEXTURE2);
@@ -305,7 +308,7 @@ int main()
 
 		staticLightMap.updateLightMap(lightList);
 
-		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 		//send data 
 		glActiveTexture(GL_TEXTURE0);
@@ -313,12 +316,11 @@ int main()
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
 		glBindImageTexture(0, staticLightMap.staticLightMap, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
-		shaderDelay = glfwGetTime();
+		
 		RayCompute.use();
-		glDispatchCompute(200, 1, 1);
-		GLsync syncState = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-
-		GLenum syncRes = glClientWaitSync(syncState, 0, 999999);
+		glDispatchCompute(100, 1, 1);
+		syncState = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+		GLenum syncRes = glClientWaitSync(syncState, 0, 9999999);
 		
 		cout << "raw >> " << syncRes << endl;
 		cout << "GL_ALREADY_SIGNALED >> " << (syncRes == GL_ALREADY_SIGNALED) << endl;
@@ -326,10 +328,11 @@ int main()
 		cout << "GL_CONDITION_SATISFIED >> " << (syncRes == GL_CONDITION_SATISFIED) << endl;
 		cout << "GL_WAIT_FAILED >> " << (syncRes == GL_WAIT_FAILED) << endl;
 
-		cout << glfwGetTime() - shaderDelay << endl;
-		while ((glfwGetTime() - shaderDelay) < 1);
-		glDeleteSync(syncState);
-		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		//1s delay
+		//shaderDelay = glfwGetTime();
+		//while ((glfwGetTime() - shaderDelay) < 1);
+
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		baseShader.use();
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 

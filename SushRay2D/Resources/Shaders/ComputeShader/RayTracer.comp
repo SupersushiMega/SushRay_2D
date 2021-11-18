@@ -4,65 +4,61 @@
 
 uniform int width;
 uniform int height;
-
 uniform int radius;
+uniform int rayCount;
 
 uniform vec2 startPos;
 
-layout(RGBA32F) uniform image2D lightMapOut;	//texture0
+layout(RGBA32F) volatile coherent uniform precise image2D lightMapOut;	//texture0
 
 layout(local_size_x = 1, local_size_y = 1) in;
 
-float maxRayCnt = float(2.0 * PI * radius);
+const unsigned int SecSize = rayCount / gl_NumWorkGroups.x;
+unsigned int rayCntr = 0;
+unsigned int r;
 
-float angle = (float(2.0 * PI) / gl_NumWorkGroups.x) * gl_WorkGroupID.x;
 float fallof = float(1.0) / radius;
+const float angleDelta = float(2.0 * PI) / rayCount;
 
 vec2 rayPos = {0,0};
 vec2 coord;
-ivec2 icoord;
 vec2 xyDelta;
-
-vec4 outCol;
-
-int r;
-
 vec2 normPix;	//normalized pixel height(y) and width(x)
 
+vec4 outCol;
+vec4 colDelta = vec4(0.1);
 
 void main()
 {
-	coord = startPos;
-	xyDelta.x = sin(angle);
-	xyDelta.y = cos(angle);
-
 	//calculate normalized Pixel height(y) an width(x)
 	normPix.x = 1 / width;
 	normPix.y = 1 / height;
-	for(r = 0; r < radius; r++)
+	for(rayCntr = 0; rayCntr < SecSize; rayCntr++)
 	{
-		outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + vec4(0.4, 0.4, 0.4, 1);
-		//outCol.g = imageLoad(lightMapOut, ivec2(coord)).g;
-		//outCol.r = float(gl_WorkGroupID.x)/628;
-		if(outCol.r > 1)
+		coord = startPos;
+		xyDelta.x = sin(angleDelta * ((SecSize * gl_WorkGroupID.x) + rayCntr));
+		xyDelta.y = cos(angleDelta * ((SecSize * gl_WorkGroupID.x) + rayCntr));
+		for(r = 0; r < radius; r++)
 		{
-			outCol.r = 1;
-		}
-		if(outCol.g > 1)
-		{
-			outCol.g = 1;
-		}
-		if(outCol.b > 1)
-		{
-			outCol.b = 1;
-		}
-		outCol.a = 1.0;
-		imageStore(lightMapOut, ivec2(floor(coord)), outCol);
-		coord += xyDelta;
-		if(((coord.x < 0) || (coord.y < 0)) || ((coord.x > width) || (coord.y > height)))
-		{
-			r = radius;
-			break;
+			outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + colDelta;
+			//outCol.g = imageLoad(lightMapOut, ivec2(coord)).g;
+			//outCol = vec4(0);
+			//outCol.r = float(gl_LocalInvocationID.x)/gl_WorkGroupSize.x;
+			if(outCol.r > 1)
+			{
+				outCol.r = 1;
+			}
+			if(outCol.g > 1)
+			{
+				outCol.g = 1;
+			}
+			if(outCol.b > 1)
+			{
+				outCol.b = 1;
+			}
+			outCol.a = gl_WorkGroupID.x;
+			imageStore(lightMapOut, ivec2(floor(coord)), outCol);
+			coord += xyDelta;
 		}
 	}
 	return;
