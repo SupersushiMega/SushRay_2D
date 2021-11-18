@@ -279,7 +279,6 @@ int main()
 	baseShader.setInt("tileSetColor", 2);
 
 	RayCompute.use();
-	RayCompute.setInt("lightMapIn", 0);
 	RayCompute.setInt("lightMapOut", 0);
 
 	RayCompute.setInt("width", 1024);
@@ -297,21 +296,18 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
-		staticLightMap.updateLightMap(lightList);
+		//staticLightMap.updateLightMap(lightList);
 
 		//send data 
-		cout << RayCompute.ID << endl;
-		cout << baseShader.ID << endl;
-
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, staticLightMap.staticLightMap);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
-		glBindImageTexture(0, staticLightMap.staticLightMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+		glBindImageTexture(0, staticLightMap.staticLightMap, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		RayCompute.use();
-		glDispatchCompute(600, 1, 1);
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		glDispatchCompute(1000, 1, 1);
+		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		baseShader.use();
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 

@@ -9,13 +9,13 @@ uniform int radius;
 
 uniform vec2 startPos;
 
-uniform sampler2D lightMapIn;	//texture0
 layout(RGBA32F) uniform image2D lightMapOut;	//texture0
 
 layout(local_size_x = 1, local_size_y = 1) in;
 
+float maxRayCnt = float(2.0 * PI * radius);
 
-float angle = (float(2.0 * PI) / gl_NumWorkGroups.x) * gl_WorkGroupID.x;
+float angle = (float(2.0 * PI) / maxRayCnt) * gl_WorkGroupID.x;
 float fallof = float(1.0) / radius;
 
 vec2 rayPos = {0,0};
@@ -31,22 +31,38 @@ vec2 normPix;	//normalized pixel height(y) and width(x)
 
 void main()
 {
-	coord = startPos;
-	xyDelta.x = sin(angle);
-	xyDelta.y = cos(angle);
-
-	//calculate normalized Pixel height(y) an width(x)
-	normPix.x = 1 / width;
-	normPix.y = 1 / height;
-	for(r = 0; r < radius; r++)
+	if(gl_WorkGroupID.x < maxRayCnt)
 	{
-		outCol = vec4(1, 1, 1, 1);
-		imageStore(lightMapOut, ivec2(coord), outCol);
-		coord += xyDelta;
-		if(((coord.x < 0) || (coord.y < 0)) || ((coord.x > width) || (coord.y > height)))
+		coord = startPos;
+		xyDelta.x = sin(angle);
+		xyDelta.y = cos(angle);
+
+		//calculate normalized Pixel height(y) an width(x)
+		normPix.x = 1 / width;
+		normPix.y = 1 / height;
+		for(r = 0; r < radius; r++)
 		{
-			r = radius;
-			break;
+			outCol = imageLoad(lightMapOut, ivec2(coord)) + vec4(0.1, 0.1, 0.1, 0.1);
+			if(outCol.r > 1)
+			{
+				outCol.r = 1;
+			}
+			if(outCol.g > 1)
+			{
+				outCol.g = 1;
+			}
+			if(outCol.b > 1)
+			{
+				outCol.b = 1;
+			}
+			outCol.a = 1.0;
+			imageStore(lightMapOut, ivec2(coord), outCol);
+			coord += xyDelta;
+			if(((coord.x < 0) || (coord.y < 0)) || ((coord.x > width) || (coord.y > height)))
+			{
+				r = radius;
+				break;
+			}
 		}
 	}
 }
