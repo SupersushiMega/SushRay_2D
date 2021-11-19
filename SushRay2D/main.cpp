@@ -80,6 +80,7 @@ public:
 	unsigned char* ColorPtr = nullptr;
 	unsigned char* ReflectivityPtr = nullptr;
 	unsigned int tileSetColor;	//Texture used by openGL
+	unsigned int tileSetReflect;	//Texture used by openGL
 };
 
 class TileMap
@@ -110,11 +111,11 @@ public:
 	uint32_t raycount;
 };
 
-class StaticLightMap
+class LightMap
 {
 public:
-	StaticLightMap(uint16_t width, uint16_t height);
-	~StaticLightMap();
+	LightMap(uint16_t width, uint16_t height);
+	~LightMap();
 	
 	void bindTileMap(TileMap& tileMap);
 	void bindTileSet(TileSet& tileSet);
@@ -131,7 +132,7 @@ public:
 
 	uint8_t maxRayBounce = 4;
 
-	unsigned int staticLightMap;	//Texture used by openGL
+	unsigned int lightMap;	//Texture used by openGL
 };
 
 	vector<Light> lightList;
@@ -141,11 +142,11 @@ public:
 int main()
 {
 	int32_t status = 0;	//variable for error handling
+	
 	TileMap tileMap(25, 25);
+	
 	uint8_t x;
 	uint8_t y;
-
-	GLsync syncState;
 
 	uint8_t world[] = {
 		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
@@ -190,6 +191,8 @@ int main()
 	}
 
 	double shaderDelay;
+
+	GLsync syncState;
 
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);	//set openGL version to 4.3
@@ -257,17 +260,17 @@ int main()
 
 	//static light map setup
 	//==============================================================================================
-	StaticLightMap staticLightMap(400, 400);
-	staticLightMap.bindTileMap(tileMap);
-	staticLightMap.bindTileSet(tileSet);
-	staticLightMap.updateLightMap(lightList);
+	LightMap LightMap(400, 400);
+	LightMap.bindTileMap(tileMap);
+	LightMap.bindTileSet(tileSet);
+	LightMap.updateLightMap(lightList);
 
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);	//set clear color	
 
 	baseShader.use();
 	baseShader.setVec2("tileScale", tileMap.tileScale);
-	baseShader.setFloat("fperPix_X", 1.0f / staticLightMap.width);
-	baseShader.setFloat("fperPix_Y", 1.0f / staticLightMap.height);
+	baseShader.setFloat("fperPix_X", 1.0f / LightMap.width);
+	baseShader.setFloat("fperPix_Y", 1.0f / LightMap.height);
 
 	baseShader.setInt("nrTilesX", tileSet.nrTilesX);
 	baseShader.setInt("nrTilesY", tileSet.nrTilesY);
@@ -282,21 +285,31 @@ int main()
 
 	//sampler setup
 	baseShader.use();
-	baseShader.setInt("staticLightMap", 0);
-	baseShader.setInt("dynamicLightMap", 1);
-	baseShader.setInt("tileSetColor", 2);
+	baseShader.setInt("LightMap", 0);
+	baseShader.setInt("tileSetColor", 1);
 
 	RayCompute.use();
 	RayCompute.setInt("lightMapOut", 0);
+	RayCompute.setInt("tileSetColor", 1);
+	RayCompute.setInt("tileSetReflect", 2);
 
 	RayCompute.setInt("width", 400);
 	RayCompute.setInt("height", 400);
-	RayCompute.setInt("radius", 100);
+	RayCompute.setInt("radius", 200);
 	RayCompute.setInt("rayCount", 1000);
+
+	RayCompute.setInt("map_nrTilesX", tileMap.width);
+	RayCompute.setInt("map_nrTilesY", tileMap.height);
+	RayCompute.setInt("set_nrTilesX", tileSet.nrTilesX);
+	RayCompute.setInt("set_nrTilesY", tileSet.nrTilesY);
+
 	RayCompute.setVec2("startPos", glm::vec2(200, 200));
 
-	glActiveTexture(GL_TEXTURE2);
+	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, tileSet.tileSetColor);
+
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, tileSet.tileSetReflect);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -306,27 +319,30 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
-		staticLightMap.updateLightMap(lightList);
+		LightMap.updateLightMap(lightList);
 
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 		//send data 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, staticLightMap.staticLightMap);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, staticLightMap.width, staticLightMap.height, 0, GL_RGB, GL_FLOAT, staticLightMap.mapPtr);
-		glBindImageTexture(0, staticLightMap.staticLightMap, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+		glBindTexture(GL_TEXTURE_2D, LightMap.lightMap);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, LightMap.width, LightMap.height, 0, GL_RGB, GL_FLOAT, LightMap.mapPtr);
+		glBindImageTexture(0, LightMap.lightMap, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
 		
 		RayCompute.use();
+		shaderDelay = glfwGetTime();
 		glDispatchCompute(100, 1, 1);
 		syncState = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-		GLenum syncRes = glClientWaitSync(syncState, 0, 9999999);
+		GLenum syncRes = glClientWaitSync(syncState, 0, 1000000000);
+		cout << "Delay >> " << (glfwGetTime() - shaderDelay)*1000 << "ms" << endl;	//output time delay
 		
-		cout << "raw >> " << syncRes << endl;
-		cout << "GL_ALREADY_SIGNALED >> " << (syncRes == GL_ALREADY_SIGNALED) << endl;
-		cout << "GL_TIMEOUT_EXPIRED >> " << (syncRes == GL_TIMEOUT_EXPIRED) << endl;
-		cout << "GL_CONDITION_SATISFIED >> " << (syncRes == GL_CONDITION_SATISFIED) << endl;
-		cout << "GL_WAIT_FAILED >> " << (syncRes == GL_WAIT_FAILED) << endl;
+		//status output
+		cout << "raw >> " << syncRes << endl;	//raw status code
+		cout << "GL_ALREADY_SIGNALED >> " << (syncRes == GL_ALREADY_SIGNALED) << endl;	//output if status is GL_ALREADY_SIGNALED
+		cout << "GL_TIMEOUT_EXPIRED >> " << (syncRes == GL_TIMEOUT_EXPIRED) << endl;	//output if status is GL_TIMEOUT_EXPIRED
+		cout << "GL_CONDITION_SATISFIED >> " << (syncRes == GL_CONDITION_SATISFIED) << endl;	//output if status is GL_CONDITION_SATISFIED
+		cout << "GL_WAIT_FAILED >> " << (syncRes == GL_WAIT_FAILED) << endl;	//output if status is GL_WAIT_FAILED
 
 		//1s delay
 		//shaderDelay = glfwGetTime();
@@ -431,22 +447,15 @@ TileSet::TileSet(const char* PathColor, const char* PathRoughness, uint8_t NrTil
 
 	floorTileEndID = FloorTileEndID;
 
-	if (!ReflectivityPtr)
+	if (ReflectivityPtr)
 	{
-		cout << "ERROR: Roughness Tileset failed to load" << endl;
-	}
-
-	if (ColorPtr)
-	{
-		tileScale.x = Color_width / nrTilesX;
-		tileScale.y = Color_height / nrTilesY;
-		//Color Tileset setup
+		//Reflectivity Tileset setup
 		//==============================================================================================
 		shader.use();
 		float borderCol[] = { 1.0f, 0.0f, 0.0f, 0.0f };	//color outside of map (displayed only when something is displayed outside of map)
-		glGenTextures(1, &tileSetColor);
+		glGenTextures(1, &tileSetReflect);
 		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, tileSetColor);
+		glBindTexture(GL_TEXTURE_2D, tileSetReflect);
 
 		//set textures to clamp to border
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
@@ -461,6 +470,54 @@ TileSet::TileSet(const char* PathColor, const char* PathRoughness, uint8_t NrTil
 
 		//get data
 		glActiveTexture(GL_TEXTURE2);
+		if (Reflectivity_nrChannels == 4)	//has alpha channel
+		{
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Reflectivity_width, Reflectivity_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, ReflectivityPtr);
+		}
+		else if (Reflectivity_nrChannels == 3)	//does not have alpha channel (no transparency)
+		{
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Reflectivity_width, Reflectivity_height, 0, GL_RGB, GL_UNSIGNED_BYTE, ReflectivityPtr);
+		}
+		else
+		{
+			cout << "ERROR: Reflect Tileset color format not compatible. Must be either RGB or RGBA" << endl;
+		}
+
+		//generate mipmap
+		glGenerateMipmap(GL_TEXTURE_2D);
+		//==============================================================================================
+	}
+	else
+	{
+		cout << "ERROR: Roughness Tileset failed to load" << endl;
+	}
+
+	if (ColorPtr)
+	{
+		tileScale.x = Color_width / nrTilesX;
+		tileScale.y = Color_height / nrTilesY;
+
+		//Color Tileset setup
+		//==============================================================================================
+		shader.use();
+		float borderCol[] = { 1.0f, 0.0f, 0.0f, 0.0f };	//color outside of map (displayed only when something is displayed outside of map)
+		glGenTextures(1, &tileSetColor);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, tileSetColor);
+
+		//set textures to clamp to border
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+		//set border color
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderCol);
+
+		//set filtering
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);	//set nearest filter for minifying
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);	//set linear filter for magnifying
+
+		//get data
+		glActiveTexture(GL_TEXTURE1);
 		if (Color_nrChannels == 4)	//has alpha channel
 		{
 			shader.setBool("hasAlpha", true);
@@ -613,7 +670,7 @@ Light::~Light()
 
 }
 
-StaticLightMap::StaticLightMap(uint16_t Width, uint16_t Height)
+LightMap::LightMap(uint16_t Width, uint16_t Height)
 {
 	
 	width = Width;
@@ -627,9 +684,9 @@ StaticLightMap::StaticLightMap(uint16_t Width, uint16_t Height)
 	//light map setup
 	//==============================================================================================
 	float borderCol[] = { 1.0f, 0.0f, 0.0f, 0.0f };	//color outside of map (displayed only when something is displayed outside of map)
-	glGenTextures(1, &staticLightMap);
+	glGenTextures(1, &lightMap);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, staticLightMap);
+	glBindTexture(GL_TEXTURE_2D, lightMap);
 
 	//set textures to clamp to border
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
@@ -650,7 +707,7 @@ StaticLightMap::StaticLightMap(uint16_t Width, uint16_t Height)
 	//==============================================================================================
 }
 
-StaticLightMap::~StaticLightMap()
+LightMap::~LightMap()
 {
 	delete[] mapPtr;
 	mapPtr = nullptr;
@@ -658,19 +715,19 @@ StaticLightMap::~StaticLightMap()
 	tileSetPtr = nullptr;
 }
 
-void StaticLightMap::bindTileMap(TileMap& tileMap)
+void LightMap::bindTileMap(TileMap& tileMap)
 {
 	tileMapPtr = &tileMap;
 	lightTileRatio.x = width / tileMapPtr->width;	//the ratio of the x axis in the light map to the x axis of the tile map
 	lightTileRatio.y = height / tileMapPtr->height;	//the ratio of the y axis in the light map to the y axis of the tile map
 }
 
-void StaticLightMap::bindTileSet(TileSet& tileSet)
+void LightMap::bindTileSet(TileSet& tileSet)
 {
 	tileSetPtr = &tileSet;
 }
 
-void StaticLightMap::updateLightMap(vector<Light>& lights)
+void LightMap::updateLightMap(vector<Light>& lights)
 {
 	uint8_t lightID;
 	uint32_t rayCntr;
@@ -702,10 +759,10 @@ void StaticLightMap::updateLightMap(vector<Light>& lights)
 		}
 	}
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, staticLightMap);
+	glBindTexture(GL_TEXTURE_2D, lightMap);
 }
 
-void StaticLightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3 lightCol, float range, uint8_t bounceCnt)
+void LightMap::castRay(glm::vec2 rayPos, glm::vec2 deltaXY, glm::vec3 lightCol, float range, uint8_t bounceCnt)
 {
 	bounceCnt++;
 

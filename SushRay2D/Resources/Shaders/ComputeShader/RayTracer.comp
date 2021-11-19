@@ -11,10 +11,16 @@ uniform int width;	//width of the lightmap
 uniform int height;	//height of the lightmap
 uniform int radius;	//radius of the light cirle if it is not disrupted
 uniform int rayCount;	//total amount of rays to be cast
+uniform int map_nrTilesX;	//number of tiles in the x direction of the tilemap
+uniform int map_nrTilesY;	//number of tiles in the y direction of the tilemap
+uniform int set_nrTilesX;	//number of tiles in the x direction of the tileset
+uniform int set_nrTilesY;	//number of tiles in the y direction of the tileset
 
 uniform vec2 startPos;	//ray start position
 
 layout(RGBA32F) volatile coherent uniform precise image2D lightMapOut;	//texture0
+uniform sampler2D tileSetColor;	//texture1
+uniform sampler2D tileSetReflect;	//texture2
 
 layout(local_size_x = 1, local_size_y = 1) in;	//size of the workgroup
 
@@ -22,7 +28,6 @@ const unsigned int SecSize = rayCount / gl_NumWorkGroups.x;	//calculate size of 
 unsigned int rayCntr = 0;	//counter for rays
 unsigned int r;	//counter for radius
 
-float fallof = float(1.0) / radius;
 const float angleDelta = float(2.0 * PI) / rayCount;	//angle difference between two neighboring rays
 
 vec2 coord;	//current position of the ray
@@ -30,7 +35,7 @@ vec2 xyDelta;	//xy difference per r
 vec2 normPix;	//normalized pixel height(y) and width(x)
 
 vec4 outCol;	//output color
-vec4 colDelta = vec4(0.1);	//color addition per ray
+vec4 colDelta = vec4(0.08);	//color addition per ray
 
 void main()
 {
@@ -41,8 +46,9 @@ void main()
 		xyDelta.y = cos(angleDelta * ((SecSize * gl_WorkGroupID.x) + rayCntr));
 		for(r = 0; r < radius; r++)
 		{
-			outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + colDelta;	//get color of current position and add colDelta to it
-			
+			outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + (colDelta * vec4(1.0 - (float(r)/radius)));	//get color of current position and add colDelta to it. With falloff calculation.
+			//outCol = texture(tileSetColor, coord / vec2(width, height));
+
 			//outCol Clamping
 			//===========================================
 			if(outCol.r > 1)

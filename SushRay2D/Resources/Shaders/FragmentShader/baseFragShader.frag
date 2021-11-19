@@ -17,9 +17,8 @@ uniform int nrTilesY;
 
 uniform bool hasAlpha;
 
-uniform sampler2D staticLightMap;	//texture0
-uniform sampler2D dynamicLightMap;	//texture1
-uniform sampler2D tileSetColor;		//texture2
+uniform sampler2D LightMap;	//texture0
+uniform sampler2D tileSetColor;	//texture1
 
 
 void main()
@@ -58,7 +57,7 @@ void main()
 				Ypos = fragPos.y - ((fperPix_Y * y) - fperPix_Y);
 				if((Ypos <= 1.0) && (Ypos >= 0.0))	//check if y is outside of static light map
 				{
-					staticLightColAverage += texture(staticLightMap, vec2(Xpos, Ypos));	//add pixel
+					staticLightColAverage += texture(LightMap, vec2(Xpos, Ypos));	//add pixel
 				}
 			}
 		}
