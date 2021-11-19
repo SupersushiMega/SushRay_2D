@@ -216,8 +216,8 @@ int main()
 	GLsync syncState;
 
 	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);	//set openGL version to 4.4
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);	//
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);	//set openGL version to 4.6
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);	//
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);	//set openGL profile to core
 
 	GLFWwindow* window = glfwCreateWindow(START_WIDTH, START_HEIGHT, "SushRay2D", NULL, NULL);	//create window
@@ -333,8 +333,6 @@ int main()
 	rayCompute.setInt("set_nrTilesX", tileSet.nrTilesX);
 	rayCompute.setInt("set_nrTilesY", tileSet.nrTilesY);
 
-	rayCompute.setVec2("startPos", glm::vec2(200, 200));
-
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, tileSet.tileSetColor);
 
@@ -362,7 +360,10 @@ int main()
 		
 		rayCompute.use();
 		shaderDelay = glfwGetTime();
-		glDispatchCompute(100, 1, 1);
+		rayCompute.setVec2("startPos", glm::vec2(200, 200));
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		glDispatchCompute(100, 20, 1);
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		syncState = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 		GLenum syncRes = glClientWaitSync(syncState, 0, 1000000000);
 		cout << "Delay >> " << (glfwGetTime() - shaderDelay)*1000 << "ms" << endl;	//output time delay
@@ -378,7 +379,6 @@ int main()
 		//shaderDelay = glfwGetTime();
 		//while ((glfwGetTime() - shaderDelay) < 1);
 
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		baseShader.use();
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 

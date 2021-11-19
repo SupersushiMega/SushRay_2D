@@ -1,4 +1,4 @@
-#version 440 core
+#version 460 core
 
 #define PI 3.1415926535897932384626433832795
 
@@ -26,23 +26,22 @@ layout(local_size_x = 1, local_size_y = 1) in;	//size of the workgroup
 const unsigned int SecSize = rayCount / gl_NumWorkGroups.x;	//calculate size of 1 sector
 unsigned int rayCntr = 0;	//counter for rays
 unsigned int r;	//counter for radius
-int arrayPos;
+int arrayPos = 0;
 
 const float angleDelta = float(2.0 * PI) / rayCount;	//angle difference between two neighboring rays
 
-vec2 coord;	//current position of the ray
+vec2 coord = startPos;	//current position of the ray
 vec2 xyDelta;	//xy difference per r
-precise float map_TileSizeX = float(map_nrTilesX)/width;
-precise float map_TileSizeY = float(map_nrTilesY)/height;	//Size of 1 tile in the tilemap
+double map_TileSizeX = double(map_nrTilesX)/width;
+double map_TileSizeY = double(map_nrTilesY)/height;	//Size of 1 tile in the tilemap
 vec2 set_TileSize = vec2(1.0/set_nrTilesX, 1.0/set_nrTilesY);	//Size of 1 tile in the tileSet
 
 vec4 outCol;	//output color
-vec4 Col;	//output color
 vec4 colDelta = vec4(0.08);	//color addition per ray
 
 layout(binding=0) buffer WorldMap
 {
-	unsigned int TileID[256];
+	int TileID[256];
 };
 
 void main()
@@ -55,19 +54,25 @@ void main()
 		
 		for(r = 0; r < radius; r++)
 		{
-			//outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + (colDelta * vec4(1.0 - (float(r)/radius)));	//get color of current position and add colDelta to it. With falloff calculation.
-			//outCol = texture(tileSetColor, coord / vec2(width, height));
-
-			arrayPos = int(((map_TileSizeY) * 16) + (map_TileSizeX));
-
-			if(arrayPos < 0)
+			if(r > 0)
 			{
-				Col = vec4(1.0, 1.0, 1.0, 0.0);
+				outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + (colDelta * vec4(1.0 - (float(r)/radius)));	//get color of current position and add colDelta to it. With falloff calculation.
 			}
 			else
 			{
-				//Col = vec4(1.0, 0.0, 0.0, 0.0);
+				outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + colDelta;
 			}
+			//outCol = texture(tileSetColor, coord / vec2(width, height));
+
+			arrayPos = int((floor(map_TileSizeY * coord.y) * 16) + floor(map_TileSizeX * coord.x));
+
+			if(TileID[arrayPos] > 0)
+			{
+				xyDelta.x = -xyDelta.x;
+				xyDelta.y = -xyDelta.y;
+			}
+
+			//outCol = vec4(arrayPos/(16*16), 0.0, 0.0, 0.0);
 
 			//outCol = vec4(1, 1.0, 0.0, 1);
 			
@@ -75,18 +80,18 @@ void main()
 
 			//outCol Clamping
 			//===========================================
-			if(outCol.r > 1)
-			{
-				outCol.r = 1;
-			}
-			if(outCol.g > 1)
-			{
-				outCol.g = 1;
-			}
-			if(outCol.b > 1)
-			{
-				outCol.b = 1;
-			}
+			//if(outCol.r > 1)
+			//{
+			//	outCol.r = 1;
+			//}
+			//if(outCol.g > 1)
+			//{
+			//	outCol.g = 1;
+			//}
+			//if(outCol.b > 1)
+			//{
+			//	outCol.b = 1;
+			//}
 			//===========================================
 
 			outCol.a = 1;	//reset alpha to 1 
