@@ -143,45 +143,66 @@ int main()
 {
 	int32_t status = 0;	//variable for error handling
 	
-	TileMap tileMap(25, 25);
+	TileMap tileMap(16, 16);
 	
 	uint8_t x;
 	uint8_t y;
+	
+	//unsigned int world[] = {
+	//	0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 2, 3, 2, 1, 1, 2, 3, 2, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 2, 2, 2, 3, 3, 2, 2, 2, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	//	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	//};
 
-	uint8_t world[] = {
-		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 2, 3, 2, 1, 1, 2, 3, 2, 0, 0, 0, 0,
-		0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0,
-		0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0,
-		0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0,
-		0, 0, 0, 0, 2, 2, 2, 3, 3, 2, 2, 2, 0, 0, 0, 0,
+	unsigned int world[] = {
+		1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	};
+
+	unsigned int* worldPtr = world;
 
 	lightList.push_back(tempLight);
 	lightList.push_back(tempLight2);
 
 
-	for (x = 4; x < 24; x++)
+	for (x = 0; x < tileMap.width; x++)
 	{
-		for (y = 4; y < 24; y++)
+		for (y = 0; y < tileMap.height; y++)
 		{
-			tileMap.SetTile(x, y, world[((y -4) * 16) + (x - 4)]);
+			tileMap.SetTile(x, y, world[((y) * tileMap.width) + (x)]);
 		}
 	}
 
-	for (x = 0; x < 25; x++)
+	for (x = 0; x < tileMap.width; x++)
 	{
-		for (y = 0; y < 25; y++)
+		for (y = 0; y < tileMap.height; y++)
 		{
 			if (tileMap.GetTile(x, y) > 3)
 			{
@@ -195,8 +216,8 @@ int main()
 	GLsync syncState;
 
 	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);	//set openGL version to 4.3
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);	//
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);	//set openGL version to 4.4
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);	//
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);	//set openGL profile to core
 
 	GLFWwindow* window = glfwCreateWindow(START_WIDTH, START_HEIGHT, "SushRay2D", NULL, NULL);	//create window
@@ -225,7 +246,7 @@ int main()
 
 	//load shaders
 	shader baseShader("Resources/Shaders/VertexShader/baseVertShader.vert", "Resources/Shaders/FragmentShader/baseFragShader.frag");
-	shader RayCompute("Resources/Shaders/ComputeShader/RayTracer.comp");
+	shader rayCompute("Resources/Shaders/ComputeShader/RayTracer.comp");
 
 	baseShader.use();
 
@@ -258,7 +279,16 @@ int main()
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(TILE_INDICES), TILE_INDICES, GL_STATIC_DRAW);
 
-	//static light map setup
+	//world map setup
+	GLuint worldSSB;	//world shader storage buffer
+	glGenBuffers(1, &worldSSB);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, worldSSB);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(world), &world, GL_STATIC_READ);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, worldSSB);	//bind shader storage buffer base to index 0
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);	//unbind shader storage buffer
+
+
+	//light map setup
 	//==============================================================================================
 	LightMap LightMap(400, 400);
 	LightMap.bindTileMap(tileMap);
@@ -288,22 +318,22 @@ int main()
 	baseShader.setInt("LightMap", 0);
 	baseShader.setInt("tileSetColor", 1);
 
-	RayCompute.use();
-	RayCompute.setInt("lightMapOut", 0);
-	RayCompute.setInt("tileSetColor", 1);
-	RayCompute.setInt("tileSetReflect", 2);
+	rayCompute.use();
+	rayCompute.setInt("lightMapOut", 0);
+	rayCompute.setInt("tileSetColor", 1);
+	rayCompute.setInt("tileSetReflect", 2);
 
-	RayCompute.setInt("width", 400);
-	RayCompute.setInt("height", 400);
-	RayCompute.setInt("radius", 200);
-	RayCompute.setInt("rayCount", 1000);
+	rayCompute.setInt("width", 400);
+	rayCompute.setInt("height", 400);
+	rayCompute.setInt("radius", 200);
+	rayCompute.setInt("rayCount", 1000);
 
-	RayCompute.setInt("map_nrTilesX", tileMap.width);
-	RayCompute.setInt("map_nrTilesY", tileMap.height);
-	RayCompute.setInt("set_nrTilesX", tileSet.nrTilesX);
-	RayCompute.setInt("set_nrTilesY", tileSet.nrTilesY);
+	rayCompute.setInt("map_nrTilesX", tileMap.width);
+	rayCompute.setInt("map_nrTilesY", tileMap.height);
+	rayCompute.setInt("set_nrTilesX", tileSet.nrTilesX);
+	rayCompute.setInt("set_nrTilesY", tileSet.nrTilesY);
 
-	RayCompute.setVec2("startPos", glm::vec2(200, 200));
+	rayCompute.setVec2("startPos", glm::vec2(200, 200));
 
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, tileSet.tileSetColor);
@@ -330,7 +360,7 @@ int main()
 		glBindImageTexture(0, LightMap.lightMap, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
 		
-		RayCompute.use();
+		rayCompute.use();
 		shaderDelay = glfwGetTime();
 		glDispatchCompute(100, 1, 1);
 		syncState = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);

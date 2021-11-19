@@ -1,4 +1,4 @@
-#version 430 core
+#version 440 core
 
 #define PI 3.1415926535897932384626433832795
 
@@ -6,7 +6,6 @@
 //Author: SupersushiMega
 
 //Splits the raycasts into n amount of sectors where n is the amount of workgroups in the x axis;
-
 uniform int width;	//width of the lightmap
 uniform int height;	//height of the lightmap
 uniform int radius;	//radius of the light cirle if it is not disrupted
@@ -27,15 +26,24 @@ layout(local_size_x = 1, local_size_y = 1) in;	//size of the workgroup
 const unsigned int SecSize = rayCount / gl_NumWorkGroups.x;	//calculate size of 1 sector
 unsigned int rayCntr = 0;	//counter for rays
 unsigned int r;	//counter for radius
+int arrayPos;
 
 const float angleDelta = float(2.0 * PI) / rayCount;	//angle difference between two neighboring rays
 
 vec2 coord;	//current position of the ray
 vec2 xyDelta;	//xy difference per r
-vec2 normPix;	//normalized pixel height(y) and width(x)
+precise float map_TileSizeX = float(map_nrTilesX)/width;
+precise float map_TileSizeY = float(map_nrTilesY)/height;	//Size of 1 tile in the tilemap
+vec2 set_TileSize = vec2(1.0/set_nrTilesX, 1.0/set_nrTilesY);	//Size of 1 tile in the tileSet
 
 vec4 outCol;	//output color
+vec4 Col;	//output color
 vec4 colDelta = vec4(0.08);	//color addition per ray
+
+layout(binding=0) buffer WorldMap
+{
+	unsigned int TileID[256];
+};
 
 void main()
 {
@@ -44,10 +52,26 @@ void main()
 		coord = startPos;
 		xyDelta.x = sin(angleDelta * ((SecSize * gl_WorkGroupID.x) + rayCntr));
 		xyDelta.y = cos(angleDelta * ((SecSize * gl_WorkGroupID.x) + rayCntr));
+		
 		for(r = 0; r < radius; r++)
 		{
-			outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + (colDelta * vec4(1.0 - (float(r)/radius)));	//get color of current position and add colDelta to it. With falloff calculation.
+			//outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + (colDelta * vec4(1.0 - (float(r)/radius)));	//get color of current position and add colDelta to it. With falloff calculation.
 			//outCol = texture(tileSetColor, coord / vec2(width, height));
+
+			arrayPos = int(((map_TileSizeY) * 16) + (map_TileSizeX));
+
+			if(arrayPos < 0)
+			{
+				Col = vec4(1.0, 1.0, 1.0, 0.0);
+			}
+			else
+			{
+				//Col = vec4(1.0, 0.0, 0.0, 0.0);
+			}
+
+			//outCol = vec4(1, 1.0, 0.0, 1);
+			
+			//outCol = vec4(floor(coord.y * map_TileSize.y));
 
 			//outCol Clamping
 			//===========================================
@@ -66,6 +90,7 @@ void main()
 			//===========================================
 
 			outCol.a = 1;	//reset alpha to 1 
+
 
 			imageStore(lightMapOut, ivec2(floor(coord)), outCol);	//write outCol to lightmap
 			
