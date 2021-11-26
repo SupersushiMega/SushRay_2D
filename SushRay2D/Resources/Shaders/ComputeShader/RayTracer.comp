@@ -26,7 +26,7 @@ layout(local_size_x = 1, local_size_y = 1) in;	//size of the workgroup
 const unsigned int SecSize = rayCount / gl_NumWorkGroups.x;	//calculate size of 1 sector
 unsigned int rayCntr = 0;	//counter for rays
 unsigned int r;	//counter for radius
-int arrayPos = 0;
+unsigned int arrayPos = 0;
 
 const float angleDelta = float(2.0 * PI) / rayCount;	//angle difference between two neighboring rays
 
@@ -34,6 +34,11 @@ vec2 coord = startPos;	//current position of the ray
 vec2 xyDelta;	//xy difference per r
 double map_TileSizeX = double(map_nrTilesX)/width;
 double map_TileSizeY = double(map_nrTilesY)/height;	//Size of 1 tile in the tilemap
+
+//XY coordinates inside of a tile
+precise double tileX = 0.0;
+precise double tileY = 0.0;
+
 vec2 set_TileSize = vec2(1.0/set_nrTilesX, 1.0/set_nrTilesY);	//Size of 1 tile in the tileSet
 
 vec4 outCol;	//output color
@@ -54,6 +59,32 @@ void main()
 		
 		for(r = 0; r < radius; r++)
 		{
+			arrayPos = int((floor(map_TileSizeY * coord.y) * 16) + floor(map_TileSizeX * coord.x));
+
+			tileX = (coord.x * map_TileSizeX) - floor(map_TileSizeX * coord.x);
+			tileY = (coord.y * map_TileSizeY) - floor(map_TileSizeY * coord.y);
+
+			tileX = abs((tileX*2)-1);
+			tileY = abs((tileY*2)-1);
+
+			if(TileID[arrayPos] > 1)
+			{
+				if(tileX > tileY)
+				{
+					xyDelta.x = -xyDelta.x;
+				}
+				else if(tileX < tileY)
+				{
+					xyDelta.y = -xyDelta.y;
+				}
+				else
+				{
+					xyDelta.x = -xyDelta.x;
+					xyDelta.y = -xyDelta.y;
+				}
+				//coord += xyDelta;	//add xyDelta to coordinates
+			}
+
 			if(r > 0)
 			{
 				outCol = imageLoad(lightMapOut, ivec2(floor(coord))) + (colDelta * vec4(1.0 - (float(r)/radius)));	//get color of current position and add colDelta to it. With falloff calculation.
@@ -64,39 +95,35 @@ void main()
 			}
 			//outCol = texture(tileSetColor, coord / vec2(width, height));
 
-			arrayPos = int((floor(map_TileSizeY * coord.y) * 16) + floor(map_TileSizeX * coord.x));
-
-			if(TileID[arrayPos] > 0)
-			{
-				xyDelta.x = -xyDelta.x;
-				xyDelta.y = -xyDelta.y;
-			}
+			//outCol.r = float(tileX);
+			//outCol.g = float(tileY);
+			//outCol.b = 0;
 
 			//outCol = vec4(arrayPos/(16*16), 0.0, 0.0, 0.0);
 
-			//outCol = vec4(1, 1.0, 0.0, 1);
+			//outCol = vec4(1);
 			
 			//outCol = vec4(floor(coord.y * map_TileSize.y));
 
 			//outCol Clamping
 			//===========================================
-			//if(outCol.r > 1)
+			//if(outCol.r > 4)
 			//{
-			//	outCol.r = 1;
+			//	outCol.r = 4;
 			//}
-			//if(outCol.g > 1)
+			//if(outCol.g > 4)
 			//{
-			//	outCol.g = 1;
+			//	outCol.g = 4;
 			//}
-			//if(outCol.b > 1)
+			//if(outCol.b > 4)
 			//{
-			//	outCol.b = 1;
+			//	outCol.b = 4;
 			//}
 			//===========================================
 
 			outCol.a = 1;	//reset alpha to 1 
 
-
+			memoryBarrier();
 			imageStore(lightMapOut, ivec2(floor(coord)), outCol);	//write outCol to lightmap
 			
 			coord += xyDelta;	//add xyDelta to coordinates

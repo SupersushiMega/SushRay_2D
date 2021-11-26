@@ -1,4 +1,4 @@
-#version 430 core
+#version 460 core
 
 in vec3 fragPos;
 in vec2 texCoord;
@@ -57,15 +57,15 @@ void main()
 				Ypos = fragPos.y - ((fperPix_Y * y) - fperPix_Y);
 				if((Ypos <= 1.0) && (Ypos >= 0.0))	//check if y is outside of static light map
 				{
-					//staticLightColAverage += texture(LightMap, vec2(Xpos, Ypos));	//add pixel
+					staticLightColAverage += texture(LightMap, vec2(Xpos, Ypos));	//add pixel
 				}
 			}
 		}
 	}
-	staticLightColAverage += texture(LightMap, vec2(Xpos, Ypos));	//add pixel
+	//staticLightColAverage += texture(LightMap, vec2(Xpos, Ypos));	//add pixel
 	staticLightColAverage.a = 1;
 	//staticLightColAverage += 0.3;
-	//staticLightColAverage /= 9;
+	staticLightColAverage /= 9;
 	//staticLightColAverage = vec4(1);
 	//=====================================================================================
 	//FragColor = staticLightColAverage;
